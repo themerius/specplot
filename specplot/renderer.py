@@ -301,37 +301,79 @@ class DiagramRenderer:
         """Render an edge between nodes."""
         from .models import EdgeStyle, Node, OutlineItem, ShowAs
 
-        def get_effective_node(node: Node) -> Node:
-            """Get the effective node for edge connection.
+        def get_connection_point(
+            node: Node, direction: str
+        ) -> tuple[float, float]:
+            """Get connection point for a node.
 
-            For outline children, return the parent node instead.
+            For outline children: connects from parent's edge at the outline item's y-position.
+            For outline parents: connects from header area (not center of entire node).
+            For regular nodes: connects from the node's edge at vertical center.
             """
             if node._parent and node._parent.show_as == ShowAs.OUTLINE:
-                return node._parent
-            return node
+                # Outline child: use parent's x but this item's y position
+                parent = node._parent
+                try:
+                    idx = parent.children.index(node)
+                    return get_outline_item_connection_point(
+                        parent, idx, direction, self.config
+                    )
+                except ValueError:
+                    pass
 
-        # Get effective nodes (outline children use their parent)
-        source_node = get_effective_node(edge.source) if isinstance(edge.source, Node) else None
-        target_node = get_effective_node(edge.target) if isinstance(edge.target, Node) else None
+            # For nodes with OUTLINE children, connect from header area
+            if node.children and node.show_as == ShowAs.OUTLINE:
+                header_y = node.y + self.config.header_height / 2
+                if direction == "right":
+                    return node.x + node.width, header_y
+                elif direction == "left":
+                    return node.x, header_y
+
+            # Regular node
+            return get_node_connection_point(node, direction)
+
+        # Get source and target nodes
+        if isinstance(edge.source, Node):
+            source_node = edge.source
+        elif isinstance(edge.source, OutlineItem):
+            source_node = edge.source._parent_node
+        else:
+            return
+
+        if isinstance(edge.target, Node):
+            target_node = edge.target
+        elif isinstance(edge.target, OutlineItem):
+            target_node = edge.target._parent_node
+        else:
+            return
 
         if source_node is None or target_node is None:
-            # Handle OutlineItem sources/targets (legacy)
-            if isinstance(edge.source, OutlineItem):
-                source_node = edge.source._parent_node
-            if isinstance(edge.target, OutlineItem):
-                target_node = edge.target._parent_node
-            if source_node is None or target_node is None:
-                return
+            return
 
         # Get connection points
-        sx, sy = get_node_connection_point(source_node, "right")
-        tx, ty = get_node_connection_point(target_node, "left")
+        sx, sy = get_connection_point(edge.source if isinstance(edge.source, Node) else source_node, "right")
+        tx, ty = get_connection_point(edge.target if isinstance(edge.target, Node) else target_node, "left")
+
+        # For outline children, get the parent's x position for proper edge routing
+        source_parent = edge.source._parent if isinstance(edge.source, Node) and edge.source._parent and edge.source._parent.show_as == ShowAs.OUTLINE else None
+        target_parent = edge.target._parent if isinstance(edge.target, Node) and edge.target._parent and edge.target._parent.show_as == ShowAs.OUTLINE else None
+
+        # Determine direction based on parent nodes (for outline items) or nodes themselves
+        source_x = source_parent.x if source_parent else source_node.x
+        target_x = target_parent.x if target_parent else target_node.x
+        source_right = source_x + (source_parent.width if source_parent else source_node.width)
+        target_right = target_x + (target_parent.width if target_parent else target_node.width)
 
         # Determine if we need to flip the connection points
-        if sx > tx:
-            # Target is to the left of source, flip connection points
-            sx, sy = get_node_connection_point(source_node, "left")
-            tx, ty = get_node_connection_point(target_node, "right")
+        if source_right > target_x and source_x < target_right:
+            # Overlapping horizontally - use closest edges
+            if sx > tx:
+                sx, sy = get_connection_point(edge.source if isinstance(edge.source, Node) else source_node, "left")
+                tx, ty = get_connection_point(edge.target if isinstance(edge.target, Node) else target_node, "right")
+        elif source_x > target_right:
+            # Source is to the right of target
+            sx, sy = get_connection_point(edge.source if isinstance(edge.source, Node) else source_node, "left")
+            tx, ty = get_connection_point(edge.target if isinstance(edge.target, Node) else target_node, "right")
 
         # Style settings
         is_dotted = edge.style in (

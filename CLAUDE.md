@@ -31,7 +31,7 @@ uv run python main.py  # generates example.svg
 
 - Fixed node width (200px) for consistent appearance
 - Text truncation: labels 20 chars, descriptions 28 chars, outline items 24 chars
-- Edges from OUTLINE children connect from parent node
+- Edges from OUTLINE children connect from parent node's edge at the item's y-position
 - Smooth bezier curves with horizontal exit/entry
 - Material Symbols icons fetched from Google CDN, cached locally
 - Edges rendered on top of nodes (arrowheads visible)

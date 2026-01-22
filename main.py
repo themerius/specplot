@@ -18,15 +18,14 @@ def main():
             show_as=GROUP,
             grid=(2, 1),
         ) as env:
-            node(icon="storage", label="Database", description="schmello db")
-            with node(icon="storage", label="Database", description="hello db") as db:
+            with node(icon="storage", label="Web Server") as web:
                 pass
-            with node(icon="dns", label="Web Server") as web:
+            with node(icon="database", label="Database", description="hello db") as db:
                 pass
 
         # Agents as outline
         with node(
-            icon="smart_toy",
+            icon="hive",
             label="AI Agents",
             description="Our intelligent agents",
             show_as=OUTLINE,
