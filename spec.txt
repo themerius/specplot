@@ -1,0 +1,82 @@
+* diagram
+  * user
+  * swarm env
+    * cli
+    * signal
+    * data
+    * failures
+    * goal
+  * swarm agents - all implement the same interface
+    * head
+    * email2pdf
+    * writer
+
+  * imap service
+  * filesystem
+
+
+  user >> cli
+  head >> imap
+  writer >> filesystem
+
+
+* i want to build an architecture diagramming tool
+* it should use python for a diagramming dsl
+  * inspriation could be https://github.com/mingrammer/diagrams
+* it should output svg
+  * as svg drawing lib we could use https://github.com/cduck/drawsvg
+* there should be nodes and edges
+* the nodes should be able to be grouped/stacked into each other when declared
+* each node is a box like this:
+
+----------------
+| [icon] label |
+----------------
+|description   |
+----------------
+
+* the description is smaller text and should be truncated so it does not take to much space
+* if description not set it's not shown
+* the icon should be material symbols https://developers.google.com/fonts/docs/material_symbols (and use their icon names, e.g. database)
+* nodes can be connected with different arrow/edge types, <-, ->, -- and dotted.
+* besides the description each node can be optionally get an outline attached, so the box would look like this:
+
+----------------
+| [icon] label |
+----------------
+|description   |
+----------------
+|- item 1      |
+|- item 2      |
+|  - item 2.1  |
+| ...          |
+----------------
+
+* the outline items can be also an edge target
+* the outline items can be either shown as outline like this
+* or the outline items can be shown as "full nodes" nested within the parent node (basically as group)
+* the user should be able to link via edges/arrows the nested nodes or even the entire group
+* the user can also choose the grid option for the group (top bottom, left right, 2x2 grid, 2x4 grid etc.)
+
+* the idea for the python dsl to create diagrams:
+
+with diagram(filename="thing"):
+    user = node(icon="person", label="user", description=None)
+    with node(icon="cloud", label="cloud env", description="on prem hosted", show_as=GROUP) as env:
+        db = node(icon="database", label="db1")
+        web = node(icon="host", label="web1")
+
+    # show_as can be implemented as literal. default is outline
+
+    with node(icon="hive", label="agents", description="our agents", show_as=OUTLINE) as agents:
+        node(icon="cognition", label="reader agent")
+        node(icon="cognition", label="annotator agent")
+        writer = node(icon="cognition", label="writer agent")
+
+    # edges
+    user >> web
+    agents >> env  # connect to entire group
+    writer >> db  # connect a outline point with a node within a group
+
+the generated svg files should look professional, and good readable so that they can be embedded in documentation, papers etc. - everything a principal (software) architect likes.
+create the python library. (it should use uv for dependency management, project is initialized alreay)
