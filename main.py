@@ -33,7 +33,9 @@ def main():
             node(icon="psychology", label="Email2PDF")
             node(icon="psychology", label="PDF2Markdown")
             node(icon="psychology", label="Classification", description="Detects if invoice")
-            node(icon="psychology", label="Annotate", description="Tagging of invoice infos")
+            with node(icon="psychology", label="Annotate", description="Tagging of invoice infos"):
+                node(icon="psychology", label="sub agent 1")
+                node(icon="psychology", label="sub agent 2")
             writer = node(icon="psychology", label="Writer")
 
         fs = node(icon="folder_open", label="Filesystem")
