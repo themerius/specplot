@@ -1,43 +1,36 @@
 """Example usage of specplot."""
 
-from specplot import GROUP, OUTLINE, diagram, node
+from specplot import diagram, node
 
 
 def main():
     """Create an example architecture diagram."""
     with diagram(filename="example"):
-        # User node
-        with node(icon="person", label="User") as user:
-            pass
+        # Simple node - no 'with' needed when no children
+        user = node(icon="person", label="User")
 
-        # Cloud environment group
+        # Group with nested nodes - use 'with' for children
         with node(
             icon="cloud",
             label="Cloud Environment",
             description="On-prem hosted infrastructure",
-            show_as=GROUP,
+            show_as="group",
             grid=(2, 1),
         ) as env:
-            with node(icon="storage", label="Web Server") as web:
-                pass
-            with node(icon="database", label="Database", description="hello db") as db:
-                pass
+            web = node(icon="storage", label="Web Server")
+            db = node(icon="database", label="Database", description="hello db")
 
-        # Agents as outline
+        # Outline mode (default) - use 'with' for children
         with node(
             icon="hive",
             label="AI Agents",
             description="Our intelligent agents",
-            show_as=OUTLINE,
         ) as agents:
-            with node(icon="psychology", label="Reader Agent"):
-                pass
-            with node(icon="psychology", label="Annotator Agent"):
-                pass
-            with node(icon="psychology", label="Writer Agent") as writer:
-                pass
+            node(icon="psychology", label="Reader Agent")
+            node(icon="psychology", label="Annotator Agent")
+            writer = node(icon="psychology", label="Writer Agent")
 
-        # Create edges
+        # Edges
         user >> web | "HTTPS"
         agents >> env
         writer >> db | "Write"

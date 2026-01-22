@@ -11,18 +11,18 @@ uv add specplot
 ## Quick Start
 
 ```python
-from specplot import diagram, node, GROUP, OUTLINE
+from specplot import diagram, node
 
 with diagram(filename="architecture"):
-    # Create a simple node
+    # Simple node - no 'with' needed
     user = node(icon="person", label="User")
 
-    # Create a group with nested nodes
-    with node(icon="cloud", label="Cloud", show_as=GROUP, grid=(1, 2)) as cloud:
+    # Group with nested nodes
+    with node(icon="cloud", label="Cloud", show_as="group", grid=(1, 2)):
         db = node(icon="database", label="Database")
         web = node(icon="dns", label="Web Server")
 
-    # Create edges with labels
+    # Edges with labels
     user >> web | "HTTPS"
     web >> db | "SQL"
 ```
@@ -35,25 +35,25 @@ Nodes are the basic building blocks. Each node has:
 - **icon**: Material Symbols icon name (e.g., "database", "person", "cloud")
 - **label**: Main text displayed in the header
 - **description**: Optional smaller text below the header (auto-truncated)
-- **show_as**: How to display children - `GROUP` or `OUTLINE`
-- **grid**: Layout grid for GROUP mode as `(rows, cols)` tuple
+- **show_as**: `"group"` or `"outline"` for child display mode
+- **grid**: Layout grid for group mode as `(rows, cols)` tuple
 
 ```python
-# Simple node
+# Simple node - no context manager needed
 db = node(icon="database", label="PostgreSQL", description="Primary database")
 
-# Node with grouped children
-with node(icon="cloud", label="AWS", show_as=GROUP, grid=(2, 2)) as aws:
+# Node with grouped children - use 'with' for nesting
+with node(icon="cloud", label="AWS", show_as="group", grid=(2, 2)):
     node(icon="storage", label="S3")
     node(icon="dns", label="Route53")
     node(icon="security", label="IAM")
     node(icon="computer", label="EC2")
 
-# Node with outline children (bullet list)
-with node(icon="api", label="API", show_as=OUTLINE) as api:
+# Node with outline children (bullet list) - default mode
+with node(icon="api", label="API") as api:
     node(label="GET /users")
     node(label="POST /users")
-    node(label="DELETE /users/:id")
+    delete = node(label="DELETE /users/:id")
 ```
 
 ### Edges
@@ -100,7 +100,7 @@ renderer = DiagramRenderer(theme=theme)
 ## Example
 
 ```python
-from specplot import diagram, node, GROUP, OUTLINE
+from specplot import diagram, node
 
 with diagram(filename="system"):
     user = node(icon="person", label="User")
@@ -109,7 +109,7 @@ with diagram(filename="system"):
         icon="cloud",
         label="Cloud Environment",
         description="On-prem hosted",
-        show_as=GROUP,
+        show_as="group",
         grid=(1, 2),
     ) as env:
         db = node(icon="storage", label="Database")
@@ -119,9 +119,8 @@ with diagram(filename="system"):
         icon="smart_toy",
         label="AI Agents",
         description="Intelligent assistants",
-        show_as=OUTLINE,
     ) as agents:
-        reader = node(icon="psychology", label="Reader Agent")
+        node(icon="psychology", label="Reader Agent")
         writer = node(icon="psychology", label="Writer Agent")
 
     user >> web | "HTTPS"
@@ -134,15 +133,17 @@ with diagram(filename="system"):
 ### `diagram(filename, title=None, **kwargs)`
 Context manager that creates and renders a diagram.
 
-### `node(icon, label, description=None, show_as=OUTLINE, grid=None)`
-Context manager or function that creates a node. Returns the Node object.
+### `node(icon, label, description=None, show_as="outline", grid=None)`
+Creates a node. Can be used with or without context manager:
+- Without `with`: for simple nodes with no children
+- With `with`: when the node has nested children
 
 ### `edge(source, target, style="->", label=None)`
 Explicitly create an edge between nodes.
 
-### Constants
-- `GROUP` - Display children as nested nodes
-- `OUTLINE` - Display children as bullet list
+### show_as values
+- `"group"` - Display children as nested node boxes
+- `"outline"` - Display children as bullet list (default)
 
 ## License
 

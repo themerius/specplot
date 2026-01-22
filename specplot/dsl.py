@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from .models import Diagram, Edge, EdgeStyle, Node, OutlineItem, ShowAs
 from .renderer import render_to_svg
@@ -11,9 +11,8 @@ from .renderer import render_to_svg
 if TYPE_CHECKING:
     from collections.abc import Generator
 
-# Display mode constants
-GROUP = ShowAs.GROUP
-OUTLINE = ShowAs.OUTLINE
+# Type alias for show_as parameter
+ShowAsLiteral = Literal["group", "outline"]
 
 # Context stack for nested node creation
 _diagram_stack: list[Diagram] = []
@@ -30,6 +29,15 @@ def _current_parent() -> Node | None:
     return _node_stack[-1] if _node_stack else None
 
 
+def _parse_show_as(value: ShowAsLiteral | ShowAs) -> ShowAs:
+    """Convert string literal to ShowAs enum."""
+    if isinstance(value, ShowAs):
+        return value
+    if value == "group":
+        return ShowAs.GROUP
+    return ShowAs.OUTLINE
+
+
 @contextmanager
 def diagram(
     filename: str = "diagram",
@@ -39,9 +47,10 @@ def diagram(
     """Create a diagram context.
 
     Usage:
-        with diagram(filename="my_diagram") as d:
-            # Create nodes and edges here
-            pass
+        with diagram(filename="my_diagram"):
+            user = node(icon="person", label="User")
+            db = node(icon="database", label="Database")
+            user >> db
 
     Args:
         filename: Output filename (without extension)
@@ -62,42 +71,97 @@ def diagram(
         render_to_svg(d, filename)
 
 
-@contextmanager
+class NodeContext:
+    """A node that can be used with or without context manager.
+
+    Usage:
+        # Without context manager (no children)
+        db = node(icon="database", label="Database")
+
+        # With context manager (has children)
+        with node(icon="cloud", label="Cloud", show_as="group") as cloud:
+            web = node(icon="web", label="Web")
+    """
+
+    def __init__(self, node: Node):
+        self._node = node
+        self._entered = False
+
+    def __enter__(self) -> Node:
+        """Enter context manager - push node onto stack for children."""
+        _node_stack.append(self._node)
+        self._entered = True
+        return self._node
+
+    def __exit__(self, *args: Any) -> None:
+        """Exit context manager - pop node from stack."""
+        if self._entered:
+            _node_stack.pop()
+
+    # Delegate all attribute access to the underlying node
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._node, name)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name.startswith("_"):
+            object.__setattr__(self, name, value)
+        else:
+            setattr(self._node, name, value)
+
+    # Support >> operator for edges
+    def __rshift__(self, other: Node | NodeContext | OutlineItem) -> Edge:
+        target = other._node if isinstance(other, NodeContext) else other
+        return self._node >> target
+
+    def __lshift__(self, other: Node | NodeContext | OutlineItem) -> Edge:
+        target = other._node if isinstance(other, NodeContext) else other
+        return self._node << target
+
+    def __repr__(self) -> str:
+        return repr(self._node)
+
+
 def node(
     icon: str | None = None,
     label: str = "",
     description: str | None = None,
-    show_as: ShowAs = ShowAs.OUTLINE,
+    show_as: ShowAsLiteral | ShowAs = "outline",
     grid: tuple[int, int] | None = None,
     **kwargs: Any,
-) -> Generator[Node]:
+) -> NodeContext:
     """Create a node, optionally as a context for child nodes.
 
-    Usage:
-        # Simple node
+    Can be used with or without context manager:
+
+        # Simple node (no children)
         db = node(icon="database", label="Database")
 
-        # Node with children (group)
-        with node(icon="cloud", label="Cloud", show_as=GROUP) as cloud:
+        # Node with children - use 'with' syntax
+        with node(icon="cloud", label="Cloud", show_as="group") as cloud:
             web = node(icon="web", label="Web Server")
             api = node(icon="api", label="API")
+
+        # Outline mode (default)
+        with node(icon="api", label="Agents", show_as="outline") as agents:
+            node(icon="robot", label="Reader")
+            writer = node(icon="robot", label="Writer")
 
     Args:
         icon: Material Symbols icon name
         label: Node label text
         description: Optional description text
-        show_as: GROUP or OUTLINE for child display mode
+        show_as: "group" or "outline" for child display mode
         grid: Grid layout as (rows, cols) tuple
         **kwargs: Additional node options
 
-    Yields:
-        The Node object
+    Returns:
+        NodeContext that can be used with or without 'with' statement
     """
     n = Node(
         icon=icon,
         label=label,
         description=description,
-        show_as=show_as,
+        show_as=_parse_show_as(show_as),
         grid=grid,
         **kwargs,
     )
@@ -115,48 +179,12 @@ def node(
         n._diagram = current_diag
         current_diag.nodes.append(n)
 
-    _node_stack.append(n)
-
-    try:
-        yield n
-    finally:
-        _node_stack.pop()
-
-
-def create_node(
-    icon: str | None = None,
-    label: str = "",
-    description: str | None = None,
-    show_as: ShowAs = ShowAs.OUTLINE,
-    grid: tuple[int, int] | None = None,
-    **kwargs: Any,
-) -> Node:
-    """Create a node without using context manager.
-
-    This is useful when you don't need to nest children.
-
-    Usage:
-        db = create_node(icon="database", label="Database")
-    """
-    with node(icon=icon, label=label, description=description, show_as=show_as, grid=grid, **kwargs) as n:
-        pass
-    return n
-
-
-def outline_item(text: str, children: list[OutlineItem] | None = None) -> OutlineItem:
-    """Create an outline item for a node.
-
-    Usage:
-        with node(icon="api", label="API") as api:
-            api.outline.append(outline_item("GET /users"))
-            api.outline.append(outline_item("POST /users"))
-    """
-    return OutlineItem(text=text, children=children or [])
+    return NodeContext(n)
 
 
 def edge(
-    source: Node | OutlineItem,
-    target: Node | OutlineItem,
+    source: Node | NodeContext | OutlineItem,
+    target: Node | NodeContext | OutlineItem,
     style: EdgeStyle | str = EdgeStyle.ARROW_RIGHT,
     label: str | None = None,
 ) -> Edge:
@@ -175,6 +203,12 @@ def edge(
     Returns:
         The Edge object
     """
+    # Unwrap NodeContext if needed
+    if isinstance(source, NodeContext):
+        source = source._node
+    if isinstance(target, NodeContext):
+        target = target._node
+
     # Convert string style to enum
     if isinstance(style, str):
         style_map = {
@@ -198,43 +232,6 @@ def edge(
     return e
 
 
-class EdgeBuilder:
-    """Helper class for building edges with labels using | operator."""
-
-    def __init__(self, source: Node | OutlineItem, target: Node | OutlineItem, style: EdgeStyle):
-        self.source = source
-        self.target = target
-        self.style = style
-        self._edge: Edge | None = None
-
-    def __or__(self, label: str) -> Edge:
-        """Add a label to the edge."""
-        e = edge(self.source, self.target, self.style, label=label)
-        self._edge = e
-        return e
-
-    def __repr__(self) -> str:
-        return f"EdgeBuilder({self.source} -> {self.target})"
-
-
-# Monkey-patch Node for better edge syntax
-_original_node_rshift = Node.__rshift__
-
-
-def _new_node_rshift(self: Node, other: Node | OutlineItem | str) -> Edge | EdgeBuilder:
-    """Enhanced >> operator that supports labels."""
-    if isinstance(other, str):
-        # This is actually a label, return edge builder
-        raise TypeError("Use (node >> node) | 'label' syntax for labeled edges")
-
-    edge_obj = _original_node_rshift(self, other)
-    return edge_obj
-
-
-Node.__rshift__ = _new_node_rshift  # type: ignore
-
-
-# Provide simpler function names as aliases
-def n(icon: str | None = None, label: str = "", **kwargs: Any) -> Node:
-    """Shorthand for create_node()."""
-    return create_node(icon=icon, label=label, **kwargs)
+# Keep backward compatibility with enum constants
+GROUP = ShowAs.GROUP
+OUTLINE = ShowAs.OUTLINE

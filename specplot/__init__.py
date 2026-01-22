@@ -17,12 +17,10 @@ Example usage:
 from .dsl import (
     GROUP,
     OUTLINE,
-    create_node,
+    NodeContext,
     diagram,
     edge,
-    n,
     node,
-    outline_item,
 )
 from .models import (
     Diagram,
@@ -45,11 +43,9 @@ __all__ = [
     # DSL functions
     "diagram",
     "node",
-    "create_node",
-    "n",
     "edge",
-    "outline_item",
-    # Constants
+    "NodeContext",
+    # Constants (backward compatibility)
     "GROUP",
     "OUTLINE",
     # Models
