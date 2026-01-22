@@ -13,7 +13,7 @@ def main():
         with node(
             icon="cloud",
             label="Swarm Environment",
-            description="Contains essentials for agents to work",
+            description="Contains essentials for agents to work.",
         ) as env:
             cli = node(icon="terminal", label="Command Line Interface")
             goal = node(icon="assignment", label="Overall Goal")
@@ -29,7 +29,7 @@ def main():
             show_as="group",
             grid=(3, 2),
         ) as agents:
-            node(icon="psychology", label="Head")
+            node(icon="psychology", label="Head", description="This thing will parse user input and translate it to machine readable inputs.")
             node(icon="psychology", label="Email2PDF")
             node(icon="psychology", label="PDF2Markdown")
             node(icon="psychology", label="Classification", description="Detects if invoice")

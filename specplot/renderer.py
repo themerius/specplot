@@ -59,6 +59,38 @@ def truncate_text(text: str, max_chars: int) -> str:
     return text[: max_chars - 1] + "\u2026"  # Unicode ellipsis
 
 
+def wrap_text_two_lines(text: str, max_chars_per_line: int) -> tuple[str, str | None]:
+    """Wrap text into up to two lines with word boundary awareness.
+
+    Returns:
+        (line1, line2) where line2 is None if text fits on one line
+    """
+    if len(text) <= max_chars_per_line:
+        return text, None
+
+    # Find a good break point (word boundary) near max_chars_per_line
+    break_point = max_chars_per_line
+
+    # Look backwards for a space to break at
+    while break_point > 0 and text[break_point] != ' ':
+        break_point -= 1
+
+    # If no space found, just break at max_chars
+    if break_point == 0:
+        break_point = max_chars_per_line
+
+    line1 = text[:break_point].rstrip()
+    remaining = text[break_point:].lstrip()
+
+    # Truncate second line if needed
+    if len(remaining) > max_chars_per_line:
+        line2 = remaining[:max_chars_per_line - 1] + "\u2026"
+    else:
+        line2 = remaining
+
+    return line1, line2 if remaining else None
+
+
 class DiagramRenderer:
     """Renders diagrams to SVG."""
 
@@ -220,26 +252,51 @@ class DiagramRenderer:
             )
         )
 
-        # Description (single line, truncated to fit node width)
+        # Description (two-line box with word wrapping)
         current_y = y + header_height
 
         if node.description:
             # Calculate max chars based on available width
             available_width = w - (self.config.node_padding * 2)
             max_chars = int(available_width / self.config.char_width_avg)
-            desc_text = truncate_text(node.description, max_chars)
+
+            line1, line2 = wrap_text_two_lines(node.description, max_chars)
+
+            line_height = 16  # Spacing between lines
+            # Center the text block vertically in the description area
+            if line2:
+                # Two lines: position them centered
+                text_block_height = line_height * 2
+                start_y = current_y + (self.config.description_height - text_block_height) / 2 + line_height / 2
+            else:
+                # One line: center it vertically
+                start_y = current_y + self.config.description_height / 2
 
             d.append(
                 draw.Text(
-                    desc_text,
+                    line1,
                     self.config.font_size_description,
                     x + self.config.node_padding,
-                    current_y + self.config.description_height / 2,
+                    start_y,
                     fill=self.theme.text_secondary,
                     font_family="Inter, -apple-system, BlinkMacSystemFont, sans-serif",
                     dominant_baseline="middle",
                 )
             )
+
+            if line2:
+                d.append(
+                    draw.Text(
+                        line2,
+                        self.config.font_size_description,
+                        x + self.config.node_padding,
+                        start_y + line_height,
+                        fill=self.theme.text_secondary,
+                        font_family="Inter, -apple-system, BlinkMacSystemFont, sans-serif",
+                        dominant_baseline="middle",
+                    )
+                )
+
             current_y += self.config.description_height
 
             # Separator line after description (only if there are children)

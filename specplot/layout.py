@@ -17,7 +17,7 @@ class LayoutConfig:
     node_width: float = 200
     node_padding: float = 12
     header_height: float = 40
-    description_height: float = 20  # Single line description
+    description_height: float = 38  # Two-line description box
     outline_item_height: float = 22
     group_padding: float = 16
     group_header_height: float = 44  # Header + optional description
