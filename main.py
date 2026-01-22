@@ -12,28 +12,36 @@ def main():
         # Group with nested nodes - use 'with' for children
         with node(
             icon="cloud",
-            label="Cloud Environment",
-            description="On-prem hosted infrastructure",
-            show_as="group",
-            grid=(2, 1),
+            label="Swarm Environment",
+            description="Contains essentials for agents to work",
         ) as env:
-            web = node(icon="storage", label="Web Server")
-            db = node(icon="database", label="Database", description="hello db")
+            cli = node(icon="terminal", label="Command Line Interface")
+            goal = node(icon="assignment", label="Overall Goal")
+            db = node(icon="database", label="Data Store", description="hello db")
+            dbf = node(icon="database", label="Failure Store", description="hello db")
+            dbs = node(icon="database", label="Signals", description="hello db")
 
         # Outline mode (default) - use 'with' for children
         with node(
             icon="hive",
             label="AI Agents",
             description="Our intelligent agents",
+            show_as="group",
+            grid=(3, 2),
         ) as agents:
-            node(icon="psychology", label="Reader Agent")
-            node(icon="psychology", label="Annotator Agent")
-            writer = node(icon="psychology", label="Writer Agent")
+            node(icon="psychology", label="Head")
+            node(icon="psychology", label="Email2PDF")
+            node(icon="psychology", label="PDF2Markdown")
+            node(icon="psychology", label="Classification", description="Detects if invoice")
+            node(icon="psychology", label="Annotate", description="Tagging of invoice infos")
+            writer = node(icon="psychology", label="Writer")
+
+        fs = node(icon="folder_open", label="Filesystem")
 
         # Edges
-        user >> web | "HTTPS"
-        agents >> env
-        writer >> db | "Write"
+        user >> cli
+        agents >> env | "uses"
+        writer >> fs | "writes"
 
     print("Diagram saved to example.svg")
 

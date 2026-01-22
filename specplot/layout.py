@@ -27,7 +27,7 @@ class LayoutConfig:
     font_size_label: float = 14
     font_size_description: float = 11
     font_size_outline: float = 11
-    char_width_avg: float = 7  # Average character width for truncation
+    char_width_avg: float = 4.8  # Average character width for 11px sans-serif font (conservative)
     max_label_chars: int = 20  # Max chars for label
     max_description_chars: int = 28  # Max chars for description (1 line)
     max_outline_chars: int = 24  # Max chars per outline item

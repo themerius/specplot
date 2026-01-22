@@ -220,11 +220,14 @@ class DiagramRenderer:
             )
         )
 
-        # Description (single line, truncated)
+        # Description (single line, truncated to fit node width)
         current_y = y + header_height
 
         if node.description:
-            desc_text = truncate_text(node.description, self.config.max_description_chars)
+            # Calculate max chars based on available width
+            available_width = w - (self.config.node_padding * 2)
+            max_chars = int(available_width / self.config.char_width_avg)
+            desc_text = truncate_text(node.description, max_chars)
 
             d.append(
                 draw.Text(
