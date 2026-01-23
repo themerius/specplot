@@ -11,9 +11,9 @@ def main():
 
         # Group with nested nodes - use 'with' for children
         with node(
-            icon="cloud",
-            label="Swarm Environment",
-            description="Contains essentials for agents to work.",
+            icon="hive",
+            label="Swarm Colony",
+            description="Contains essential enviornment for agents to work.",
         ) as env:
             cli = node(icon="terminal", label="Command Line Interface")
             goal = node(icon="assignment", label="Overall Goal")
@@ -23,9 +23,9 @@ def main():
 
         # Outline mode (default) - use 'with' for children
         with node(
-            icon="hive",
-            label="AI Agents",
-            description="Our intelligent agents",
+            icon="genetics",
+            label="Swarm Agents",
+            description="All agents implement this interface.",
             show_as="group",
             grid=(3, 2),
         ) as agents:
@@ -38,7 +38,16 @@ def main():
                 node(icon="psychology", label="sub agent 2")
             writer = node(icon="psychology", label="Writer")
 
+        node(icon="cloud_download", label="IMAP service")
+        node(icon="extension", label="docling lib")
+        node(icon="graph_5", label="LLM (4b)")
+        node(icon="graph_5", label="LLM (1.7b)")
         fs = node(icon="folder_open", label="Filesystem")
+
+        # todo: how to steer left to right and top to bottom?
+        # automatically? or should user give hints?
+        # goal: compact, good readable overview (embedable in document/paper)
+        # todo: always show description place (just empty)
 
         # Edges
         user >> cli
