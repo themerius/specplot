@@ -1,0 +1,37 @@
+[specplot]
+
+a python library for building outline-based architecture diagrams.
+the diagrams should look professional and are good readable so that they can be embedded in documentation or high stake publications like papers.
+
+a tool for principal software architects.
+
+[[motivation]]
+
+why i build it:
+- i was frustrated with the current options
+- those options lack always something i would like
+- i consider outlining as very powerful technique to think properly and build things fast
+- i want something formal yet flexible (living documentation)
+- fast idea visualization, a thinking tool, a documentation tool
+- i like to validate architecture concepts with working code 'crystallization points', but need also a tool to present the ideas to others
+
+
+[[writing a paper]]
+
+- we have to summarize the state of the art achitecture diagrams / documentation (C4 etc.)
+- we should show the best practices
+- introduce the novel(?) idea here (outlining + architecture)
+  - and how this fits (or enhances) into those best practices
+- give some examples
+- use standard svg because it's stable, wide used, open standard and produces high quality vector graphics
+  - and it is good interpretable by LLMs
+
+[[[important literature to consider]]]
+
+- Fundamentals of Software Architecture - An Engineering Approach, by Mark Richards & Neal Ford
+
+[[[outlook]]]
+
+- creating a plain text dsl (bullet point based) for rapid jotting down architectures
+- representation of sequence diagrams in the same fashion
+- create rdf-based terminology to allow formal parseable xml's representation of architecture outline as embeddale svg-metadata (interop)
