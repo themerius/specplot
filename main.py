@@ -44,11 +44,6 @@ def main():
         node(icon="graph_5", label="LLM (1.7b)")
         fs = node(icon="folder_open", label="Filesystem")
 
-        # todo: how to steer left to right and top to bottom?
-        # automatically? or should user give hints?
-        # goal: compact, good readable overview (embedable in document/paper)
-        # todo: always show description place (just empty)
-
         # Edges
         user >> cli
         agents >> env | "uses"
