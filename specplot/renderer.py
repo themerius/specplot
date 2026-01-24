@@ -91,6 +91,299 @@ def wrap_text_two_lines(text: str, max_chars_per_line: int) -> tuple[str, str | 
     return line1, line2 if remaining else None
 
 
+class EdgeRouter:
+    """Routes edges with collision avoidance and crossing minimization.
+
+    This class pre-analyzes all edges in a diagram and assigns connection
+    points that minimize visual collisions and crossings.
+    """
+
+    def __init__(self, diagram: Diagram, config: LayoutConfig):
+        from .models import Node, ShowAs
+
+        self.diagram = diagram
+        self.config = config
+        self._node_connections: dict[int, dict[str, list[dict]]] = {}
+        self._assigned_points: dict[int, tuple[float, float, float, float]] = {}
+        # Maps edge id -> (start_x, start_y, end_x, end_y)
+
+        self._analyze_edges()
+
+    def _get_effective_bounds(self, node: Node) -> tuple[float, float, float, float]:
+        """Get effective bounds for a node, using parent for outline children."""
+        from .models import ShowAs
+
+        if node._parent and node._parent.show_as == ShowAs.OUTLINE:
+            parent = node._parent
+            return parent.x, parent.y, parent.width, parent.height
+        return node.x, node.y, node.width, node.height
+
+    def _get_node_center(self, node: Node) -> tuple[float, float]:
+        """Get center point using effective bounds."""
+        x, y, w, h = self._get_effective_bounds(node)
+        return x + w / 2, y + h / 2
+
+    def _detect_best_side(
+        self, src_node: Node, tgt_node: Node, is_source: bool
+    ) -> str:
+        """Detect best connection side for a node based on the other endpoint."""
+        from .models import ShowAs
+
+        src_x, src_y, src_w, src_h = self._get_effective_bounds(src_node)
+        tgt_x, tgt_y, tgt_w, tgt_h = self._get_effective_bounds(tgt_node)
+
+        src_cx, src_cy = src_x + src_w / 2, src_y + src_h / 2
+        tgt_cx, tgt_cy = tgt_x + tgt_w / 2, tgt_y + tgt_h / 2
+
+        dx = tgt_cx - src_cx
+        dy = tgt_cy - src_cy
+
+        # Check overlaps
+        horizontal_overlap = src_x < tgt_x + tgt_w and src_x + src_w > tgt_x
+        vertical_overlap = src_y < tgt_y + tgt_h and src_y + src_h > tgt_y
+
+        if is_source:
+            # Determine exit side
+            if horizontal_overlap and not vertical_overlap:
+                return "bottom" if dy > 0 else "top"
+            elif vertical_overlap and not horizontal_overlap:
+                return "right" if dx > 0 else "left"
+            else:
+                if abs(dx) > abs(dy):
+                    return "right" if dx > 0 else "left"
+                else:
+                    return "bottom" if dy > 0 else "top"
+        else:
+            # Determine entry side (opposite logic)
+            if horizontal_overlap and not vertical_overlap:
+                return "top" if dy > 0 else "bottom"
+            elif vertical_overlap and not horizontal_overlap:
+                return "left" if dx > 0 else "right"
+            else:
+                if abs(dx) > abs(dy):
+                    return "left" if dx > 0 else "right"
+                else:
+                    return "top" if dy > 0 else "bottom"
+
+    def _analyze_edges(self) -> None:
+        """Analyze all edges and group by node and side."""
+        from .models import Node, OutlineItem
+
+        # Initialize node connections dict
+        def ensure_node(node: Node) -> None:
+            node_id = id(node)
+            if node_id not in self._node_connections:
+                self._node_connections[node_id] = {
+                    "left": [], "right": [], "top": [], "bottom": []
+                }
+
+        # First pass: determine sides and collect edges
+        for edge in self.diagram.edges:
+            # Get actual nodes
+            if isinstance(edge.source, Node):
+                src_node = edge.source
+            elif isinstance(edge.source, OutlineItem):
+                src_node = edge.source._parent_node
+            else:
+                continue
+
+            if isinstance(edge.target, Node):
+                tgt_node = edge.target
+            elif isinstance(edge.target, OutlineItem):
+                tgt_node = edge.target._parent_node
+            else:
+                continue
+
+            if src_node is None or tgt_node is None:
+                continue
+
+            ensure_node(src_node)
+            ensure_node(tgt_node)
+
+            # Determine sides
+            src_side = self._detect_best_side(src_node, tgt_node, is_source=True)
+            tgt_side = self._detect_best_side(src_node, tgt_node, is_source=False)
+
+            # Check for same-column stacking (needs special handling)
+            src_x, src_y, src_w, src_h = self._get_effective_bounds(src_node)
+            tgt_x, tgt_y, tgt_w, tgt_h = self._get_effective_bounds(tgt_node)
+            src_cx = src_x + src_w / 2
+            tgt_cx = tgt_x + tgt_w / 2
+
+            is_same_column = abs(src_cx - tgt_cx) < min(src_w, tgt_w) / 2
+            needs_detour = is_same_column and src_side in ("top", "bottom")
+
+            # Get other endpoint position for sorting
+            tgt_cx, tgt_cy = self._get_node_center(tgt_node)
+            src_cx, src_cy = self._get_node_center(src_node)
+
+            # Store edge info for source node
+            edge_info_src = {
+                "edge": edge,
+                "edge_id": id(edge),
+                "is_source": True,
+                "other_node": tgt_node,
+                "other_x": tgt_cx,
+                "other_y": tgt_cy,
+                "side": src_side,
+                "needs_detour": needs_detour,
+                "actual_node": edge.source if isinstance(edge.source, Node) else src_node,
+            }
+
+            # Store edge info for target node
+            edge_info_tgt = {
+                "edge": edge,
+                "edge_id": id(edge),
+                "is_source": False,
+                "other_node": src_node,
+                "other_x": src_cx,
+                "other_y": src_cy,
+                "side": tgt_side,
+                "needs_detour": needs_detour,
+                "actual_node": edge.target if isinstance(edge.target, Node) else tgt_node,
+            }
+
+            # Handle detour: override sides for same-column
+            if needs_detour:
+                if src_side == "bottom":
+                    # Exit bottom-right, enter top-right
+                    edge_info_src["side"] = "bottom"
+                    edge_info_src["corner"] = "right"
+                    edge_info_tgt["side"] = "top"
+                    edge_info_tgt["corner"] = "right"
+                else:
+                    edge_info_src["side"] = "top"
+                    edge_info_src["corner"] = "right"
+                    edge_info_tgt["side"] = "bottom"
+                    edge_info_tgt["corner"] = "right"
+
+            self._node_connections[id(src_node)][edge_info_src["side"]].append(edge_info_src)
+            self._node_connections[id(tgt_node)][edge_info_tgt["side"]].append(edge_info_tgt)
+
+        # Second pass: sort edges on each side to minimize crossings
+        self._sort_edges_to_minimize_crossings()
+
+        # Third pass: assign connection points
+        self._assign_connection_points()
+
+    def _sort_edges_to_minimize_crossings(self) -> None:
+        """Sort edges on each side of each node to minimize crossings."""
+        for node_id, sides in self._node_connections.items():
+            # For left/right sides: sort by other endpoint's y position
+            for side in ["left", "right"]:
+                sides[side].sort(key=lambda e: e["other_y"])
+
+            # For top/bottom sides: sort by other endpoint's x position
+            for side in ["top", "bottom"]:
+                sides[side].sort(key=lambda e: e["other_x"])
+
+    def _assign_connection_points(self) -> None:
+        """Assign actual connection points with offsets to avoid collisions."""
+        from .models import ShowAs
+
+        for node_id, sides in self._node_connections.items():
+            for side, edges in sides.items():
+                if not edges:
+                    continue
+
+                # Get the node (from first edge)
+                first_edge = edges[0]
+                if first_edge["is_source"]:
+                    node = first_edge["actual_node"]
+                else:
+                    node = first_edge["actual_node"]
+
+                # Get effective bounds
+                x, y, w, h = self._get_effective_bounds(node)
+
+                # Calculate connection points with offsets
+                n = len(edges)
+                offset_spacing = 15  # Pixels between connection points
+                total_spread = (n - 1) * offset_spacing
+
+                for i, edge_info in enumerate(edges):
+                    edge_id = edge_info["edge_id"]
+                    is_source = edge_info["is_source"]
+                    needs_detour = edge_info.get("needs_detour", False)
+                    corner = edge_info.get("corner")
+
+                    # Calculate offset from center
+                    if n == 1:
+                        offset = 0
+                    else:
+                        offset = -total_spread / 2 + i * offset_spacing
+
+                    # Calculate base connection point
+                    if side == "right":
+                        cx = x + w
+                        cy = y + h / 2 + offset
+                    elif side == "left":
+                        cx = x
+                        cy = y + h / 2 + offset
+                    elif side == "top":
+                        cx = x + w / 2 + offset
+                        cy = y
+                    else:  # bottom
+                        cx = x + w / 2 + offset
+                        cy = y + h
+
+                    # For detour edges, adjust to corner
+                    if needs_detour and corner == "right":
+                        if side == "bottom":
+                            cx = x + w  # Right edge
+                            cy = y + h  # Bottom
+                        elif side == "top":
+                            cx = x + w  # Right edge
+                            cy = y  # Top
+
+                    # Handle outline children specially
+                    actual_node = edge_info["actual_node"]
+                    if actual_node._parent and actual_node._parent.show_as == ShowAs.OUTLINE:
+                        parent = actual_node._parent
+                        try:
+                            idx = parent.children.index(actual_node)
+                            # Calculate outline item y position
+                            base_y = parent.y + self.config.header_height
+                            if parent.description:
+                                base_y += self.config.description_height
+                            item_y = base_y + idx * self.config.outline_item_height + self.config.outline_item_height / 2
+                            cy = item_y
+                            if side == "right":
+                                cx = parent.x + parent.width
+                            elif side == "left":
+                                cx = parent.x
+                        except ValueError:
+                            pass
+
+                    # Store the assigned point
+                    if edge_id not in self._assigned_points:
+                        self._assigned_points[edge_id] = {}
+
+                    if is_source:
+                        self._assigned_points[edge_id]["source"] = (cx, cy, side, needs_detour)
+                    else:
+                        self._assigned_points[edge_id]["target"] = (cx, cy, side, needs_detour)
+
+    def get_edge_points(self, edge: Edge) -> tuple[
+        tuple[float, float, str, bool],
+        tuple[float, float, str, bool]
+    ] | None:
+        """Get assigned connection points for an edge.
+
+        Returns ((sx, sy, src_side, src_detour), (tx, ty, tgt_side, tgt_detour))
+        or None if edge wasn't analyzed.
+        """
+        edge_id = id(edge)
+        if edge_id not in self._assigned_points:
+            return None
+
+        points = self._assigned_points[edge_id]
+        if "source" not in points or "target" not in points:
+            return None
+
+        return points["source"], points["target"]
+
+
 class DiagramRenderer:
     """Renders diagrams to SVG."""
 
@@ -143,9 +436,12 @@ class DiagramRenderer:
         for node in diagram.nodes:
             self._render_node(d, node)
 
+        # Create edge router for collision-free edge placement
+        edge_router = EdgeRouter(diagram, self.config)
+
         # Render edges on top (so arrowheads are visible)
         for edge in diagram.edges:
-            self._render_edge(d, edge)
+            self._render_edge(d, edge, edge_router)
 
         return d
 
@@ -357,151 +653,17 @@ class DiagramRenderer:
             )
         )
 
-    def _render_edge(self, d: draw.Drawing, edge: Edge) -> None:
-        """Render an edge between nodes with smart routing."""
+    def _render_edge(self, d: draw.Drawing, edge: Edge, edge_router: EdgeRouter) -> None:
+        """Render an edge using pre-computed connection points from EdgeRouter."""
         from .models import EdgeStyle, Node, OutlineItem, ShowAs
 
-        def get_connection_point(
-            node: Node, direction: str
-        ) -> tuple[float, float]:
-            """Get connection point for a node.
-
-            For outline children: connects from parent's edge at the outline item's y-position.
-            For outline parents: connects from header area (not center of entire node).
-            For regular nodes: connects from the node's edge.
-            """
-            if node._parent and node._parent.show_as == ShowAs.OUTLINE:
-                # Outline child: use parent's x but this item's y position
-                parent = node._parent
-                try:
-                    idx = parent.children.index(node)
-                    return get_outline_item_connection_point(
-                        parent, idx, direction, self.config
-                    )
-                except ValueError:
-                    pass
-
-            # For nodes with OUTLINE children, connect from header area for left/right
-            if node.children and node.show_as == ShowAs.OUTLINE:
-                header_y = node.y + self.config.header_height / 2
-                if direction == "right":
-                    return node.x + node.width, header_y
-                elif direction == "left":
-                    return node.x, header_y
-                # For top/bottom, use normal node connection points
-
-            # Regular node - all 4 sides
-            return get_node_connection_point(node, direction)
-
-        def get_effective_bounds(node: Node) -> tuple[float, float, float, float]:
-            """Get effective bounds for a node, using parent for outline children.
-
-            Returns (x, y, width, height).
-            """
-            if node._parent and node._parent.show_as == ShowAs.OUTLINE:
-                # Outline child: use parent's bounds
-                parent = node._parent
-                return parent.x, parent.y, parent.width, parent.height
-            return node.x, node.y, node.width, node.height
-
-        def get_node_center_from_bounds(x: float, y: float, w: float, h: float) -> tuple[float, float]:
-            """Get center point from bounds."""
-            return x + w / 2, y + h / 2
-
-        def detect_best_directions(
-            src: Node, tgt: Node
-        ) -> tuple[str, str]:
-            """Detect best connection directions based on relative positions.
-
-            Returns (source_direction, target_direction).
-            """
-            # Use effective bounds (parent bounds for outline children)
-            src_x, src_y, src_w, src_h = get_effective_bounds(src)
-            tgt_x, tgt_y, tgt_w, tgt_h = get_effective_bounds(tgt)
-
-            src_cx, src_cy = get_node_center_from_bounds(src_x, src_y, src_w, src_h)
-            tgt_cx, tgt_cy = get_node_center_from_bounds(tgt_x, tgt_y, tgt_w, tgt_h)
-
-            dx = tgt_cx - src_cx
-            dy = tgt_cy - src_cy
-
-            # Check if nodes are in same column (vertically stacked)
-            horizontal_overlap = (
-                src_x < tgt_x + tgt_w and src_x + src_w > tgt_x
-            )
-            # Check if nodes are in same row (horizontally adjacent)
-            vertical_overlap = (
-                src_y < tgt_y + tgt_h and src_y + src_h > tgt_y
-            )
-
-            # Determine dominant direction
-            if horizontal_overlap and not vertical_overlap:
-                # Vertically stacked - use top/bottom
-                if dy > 0:
-                    return "bottom", "top"
-                else:
-                    return "top", "bottom"
-            elif vertical_overlap and not horizontal_overlap:
-                # Horizontally adjacent - use left/right
-                if dx > 0:
-                    return "right", "left"
-                else:
-                    return "left", "right"
-            else:
-                # Diagonal or overlapping - pick based on larger delta
-                if abs(dx) > abs(dy):
-                    # More horizontal
-                    if dx > 0:
-                        return "right", "left"
-                    else:
-                        return "left", "right"
-                else:
-                    # More vertical
-                    if dy > 0:
-                        return "bottom", "top"
-                    else:
-                        return "top", "bottom"
-
-        def is_same_column_stacked(src: Node, tgt: Node) -> bool:
-            """Check if nodes are vertically stacked in same column."""
-            src_x, _, src_w, _ = get_effective_bounds(src)
-            tgt_x, _, tgt_w, _ = get_effective_bounds(tgt)
-            src_cx = src_x + src_w / 2
-            tgt_cx = tgt_x + tgt_w / 2
-            # Consider same column if centers are within half a node width
-            return abs(src_cx - tgt_cx) < min(src_w, tgt_w) / 2
-
-        # Get source and target nodes
-        if isinstance(edge.source, Node):
-            source_node = edge.source
-        elif isinstance(edge.source, OutlineItem):
-            source_node = edge.source._parent_node
-        else:
+        # Get pre-computed connection points from router
+        points = edge_router.get_edge_points(edge)
+        if points is None:
             return
 
-        if isinstance(edge.target, Node):
-            target_node = edge.target
-        elif isinstance(edge.target, OutlineItem):
-            target_node = edge.target._parent_node
-        else:
-            return
-
-        if source_node is None or target_node is None:
-            return
-
-        # Detect best connection directions
-        src_dir, tgt_dir = detect_best_directions(source_node, target_node)
-
-        # Check for same-column stacking (needs curved detour)
-        needs_detour = is_same_column_stacked(source_node, target_node) and src_dir in ("top", "bottom")
-
-        # Get connection points
-        sx, sy = get_connection_point(
-            edge.source if isinstance(edge.source, Node) else source_node, src_dir
-        )
-        tx, ty = get_connection_point(
-            edge.target if isinstance(edge.target, Node) else target_node, tgt_dir
-        )
+        (sx, sy, src_side, src_detour), (tx, ty, tgt_side, tgt_detour) = points
+        needs_detour = src_detour or tgt_detour
 
         # Style settings
         is_dotted = edge.style in (
@@ -532,54 +694,29 @@ class DiagramRenderer:
                 stroke_dasharray="5,5",
             )
 
-        # Calculate control points based on connection directions
+        # Calculate control points based on connection sides
         dx = abs(tx - sx)
         dy = abs(ty - sy)
 
         if needs_detour:
             # Same-column vertical: route around via side with clear visual path
-            # Use effective bounds for outline children
-            src_x, src_y, src_w, src_h = get_effective_bounds(source_node)
-            tgt_x, tgt_y, tgt_w, tgt_h = get_effective_bounds(target_node)
+            detour_offset = 50
 
-            detour_offset = 50  # How far to go sideways
+            # Get the rightmost x coordinate for the detour
+            mid_x = max(sx, tx) + detour_offset
 
-            if src_dir == "bottom":
-                # Going down: exit bottom-right, curve right, enter top-right
-                mid_x = max(src_x + src_w, tgt_x + tgt_w) + detour_offset
-
-                # Exit from bottom-right area of source
-                sx = src_x + src_w  # Right edge
-                sy = src_y + src_h  # Bottom edge
-
-                # Enter from top-right area of target
-                tx = tgt_x + tgt_w  # Right edge
-                ty = tgt_y  # Top edge
-
-                # Control points: go right then curve down
-                c1x, c1y = mid_x, sy
-                c2x, c2y = mid_x, ty
-            else:
-                # Going up: exit top-right, curve right, enter bottom-right
-                mid_x = max(src_x + src_w, tgt_x + tgt_w) + detour_offset
-
-                sx = src_x + src_w
-                sy = src_y  # Top edge
-
-                tx = tgt_x + tgt_w
-                ty = tgt_y + tgt_h  # Bottom edge
-
-                c1x, c1y = mid_x, sy
-                c2x, c2y = mid_x, ty
+            # Control points: go right then curve to target
+            c1x, c1y = mid_x, sy
+            c2x, c2y = mid_x, ty
 
             path.M(sx, sy)
             path.C(c1x, c1y, c2x, c2y, tx, ty)
 
-        elif src_dir in ("left", "right"):
+        elif src_side in ("left", "right"):
             # Horizontal exit/entry - use horizontal control points
             control_offset = max(50, dx * 0.5)
 
-            if src_dir == "right":
+            if src_side == "right":
                 c1x, c1y = sx + control_offset, sy
                 c2x, c2y = tx - control_offset, ty
             else:
@@ -593,7 +730,7 @@ class DiagramRenderer:
             # Vertical exit/entry - use vertical control points
             control_offset = max(50, dy * 0.5)
 
-            if src_dir == "bottom":
+            if src_side == "bottom":
                 c1x, c1y = sx, sy + control_offset
                 c2x, c2y = tx, ty - control_offset
             else:
