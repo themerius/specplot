@@ -358,7 +358,7 @@ class DiagramRenderer:
         )
 
     def _render_edge(self, d: draw.Drawing, edge: Edge) -> None:
-        """Render an edge between nodes."""
+        """Render an edge between nodes with smart routing."""
         from .models import EdgeStyle, Node, OutlineItem, ShowAs
 
         def get_connection_point(
@@ -368,7 +368,7 @@ class DiagramRenderer:
 
             For outline children: connects from parent's edge at the outline item's y-position.
             For outline parents: connects from header area (not center of entire node).
-            For regular nodes: connects from the node's edge at vertical center.
+            For regular nodes: connects from the node's edge.
             """
             if node._parent and node._parent.show_as == ShowAs.OUTLINE:
                 # Outline child: use parent's x but this item's y position
@@ -381,16 +381,95 @@ class DiagramRenderer:
                 except ValueError:
                     pass
 
-            # For nodes with OUTLINE children, connect from header area
+            # For nodes with OUTLINE children, connect from header area for left/right
             if node.children and node.show_as == ShowAs.OUTLINE:
                 header_y = node.y + self.config.header_height / 2
                 if direction == "right":
                     return node.x + node.width, header_y
                 elif direction == "left":
                     return node.x, header_y
+                # For top/bottom, use normal node connection points
 
-            # Regular node
+            # Regular node - all 4 sides
             return get_node_connection_point(node, direction)
+
+        def get_effective_bounds(node: Node) -> tuple[float, float, float, float]:
+            """Get effective bounds for a node, using parent for outline children.
+
+            Returns (x, y, width, height).
+            """
+            if node._parent and node._parent.show_as == ShowAs.OUTLINE:
+                # Outline child: use parent's bounds
+                parent = node._parent
+                return parent.x, parent.y, parent.width, parent.height
+            return node.x, node.y, node.width, node.height
+
+        def get_node_center_from_bounds(x: float, y: float, w: float, h: float) -> tuple[float, float]:
+            """Get center point from bounds."""
+            return x + w / 2, y + h / 2
+
+        def detect_best_directions(
+            src: Node, tgt: Node
+        ) -> tuple[str, str]:
+            """Detect best connection directions based on relative positions.
+
+            Returns (source_direction, target_direction).
+            """
+            # Use effective bounds (parent bounds for outline children)
+            src_x, src_y, src_w, src_h = get_effective_bounds(src)
+            tgt_x, tgt_y, tgt_w, tgt_h = get_effective_bounds(tgt)
+
+            src_cx, src_cy = get_node_center_from_bounds(src_x, src_y, src_w, src_h)
+            tgt_cx, tgt_cy = get_node_center_from_bounds(tgt_x, tgt_y, tgt_w, tgt_h)
+
+            dx = tgt_cx - src_cx
+            dy = tgt_cy - src_cy
+
+            # Check if nodes are in same column (vertically stacked)
+            horizontal_overlap = (
+                src_x < tgt_x + tgt_w and src_x + src_w > tgt_x
+            )
+            # Check if nodes are in same row (horizontally adjacent)
+            vertical_overlap = (
+                src_y < tgt_y + tgt_h and src_y + src_h > tgt_y
+            )
+
+            # Determine dominant direction
+            if horizontal_overlap and not vertical_overlap:
+                # Vertically stacked - use top/bottom
+                if dy > 0:
+                    return "bottom", "top"
+                else:
+                    return "top", "bottom"
+            elif vertical_overlap and not horizontal_overlap:
+                # Horizontally adjacent - use left/right
+                if dx > 0:
+                    return "right", "left"
+                else:
+                    return "left", "right"
+            else:
+                # Diagonal or overlapping - pick based on larger delta
+                if abs(dx) > abs(dy):
+                    # More horizontal
+                    if dx > 0:
+                        return "right", "left"
+                    else:
+                        return "left", "right"
+                else:
+                    # More vertical
+                    if dy > 0:
+                        return "bottom", "top"
+                    else:
+                        return "top", "bottom"
+
+        def is_same_column_stacked(src: Node, tgt: Node) -> bool:
+            """Check if nodes are vertically stacked in same column."""
+            src_x, _, src_w, _ = get_effective_bounds(src)
+            tgt_x, _, tgt_w, _ = get_effective_bounds(tgt)
+            src_cx = src_x + src_w / 2
+            tgt_cx = tgt_x + tgt_w / 2
+            # Consider same column if centers are within half a node width
+            return abs(src_cx - tgt_cx) < min(src_w, tgt_w) / 2
 
         # Get source and target nodes
         if isinstance(edge.source, Node):
@@ -410,30 +489,19 @@ class DiagramRenderer:
         if source_node is None or target_node is None:
             return
 
+        # Detect best connection directions
+        src_dir, tgt_dir = detect_best_directions(source_node, target_node)
+
+        # Check for same-column stacking (needs curved detour)
+        needs_detour = is_same_column_stacked(source_node, target_node) and src_dir in ("top", "bottom")
+
         # Get connection points
-        sx, sy = get_connection_point(edge.source if isinstance(edge.source, Node) else source_node, "right")
-        tx, ty = get_connection_point(edge.target if isinstance(edge.target, Node) else target_node, "left")
-
-        # For outline children, get the parent's x position for proper edge routing
-        source_parent = edge.source._parent if isinstance(edge.source, Node) and edge.source._parent and edge.source._parent.show_as == ShowAs.OUTLINE else None
-        target_parent = edge.target._parent if isinstance(edge.target, Node) and edge.target._parent and edge.target._parent.show_as == ShowAs.OUTLINE else None
-
-        # Determine direction based on parent nodes (for outline items) or nodes themselves
-        source_x = source_parent.x if source_parent else source_node.x
-        target_x = target_parent.x if target_parent else target_node.x
-        source_right = source_x + (source_parent.width if source_parent else source_node.width)
-        target_right = target_x + (target_parent.width if target_parent else target_node.width)
-
-        # Determine if we need to flip the connection points
-        if source_right > target_x and source_x < target_right:
-            # Overlapping horizontally - use closest edges
-            if sx > tx:
-                sx, sy = get_connection_point(edge.source if isinstance(edge.source, Node) else source_node, "left")
-                tx, ty = get_connection_point(edge.target if isinstance(edge.target, Node) else target_node, "right")
-        elif source_x > target_right:
-            # Source is to the right of target
-            sx, sy = get_connection_point(edge.source if isinstance(edge.source, Node) else source_node, "left")
-            tx, ty = get_connection_point(edge.target if isinstance(edge.target, Node) else target_node, "right")
+        sx, sy = get_connection_point(
+            edge.source if isinstance(edge.source, Node) else source_node, src_dir
+        )
+        tx, ty = get_connection_point(
+            edge.target if isinstance(edge.target, Node) else target_node, tgt_dir
+        )
 
         # Style settings
         is_dotted = edge.style in (
@@ -450,14 +518,6 @@ class DiagramRenderer:
             EdgeStyle.DOTTED_ARROW_LEFT,
         )
 
-        # Draw path with smooth bezier curve
-        dx = abs(tx - sx)
-        dy = abs(ty - sy)
-
-        # Control point offset: proportional to horizontal distance
-        # This creates smooth S-curves that exit/enter horizontally
-        control_offset = max(50, dx * 0.5)
-
         path = draw.Path(
             stroke=self.theme.edge_color,
             stroke_width=1.5,
@@ -472,19 +532,76 @@ class DiagramRenderer:
                 stroke_dasharray="5,5",
             )
 
-        # Cubic bezier: control points are horizontally offset from endpoints
-        # This ensures curves exit and enter horizontally for a clean look
-        if sx < tx:
-            # Left to right
-            c1x, c1y = sx + control_offset, sy
-            c2x, c2y = tx - control_offset, ty
-        else:
-            # Right to left
-            c1x, c1y = sx - control_offset, sy
-            c2x, c2y = tx + control_offset, ty
+        # Calculate control points based on connection directions
+        dx = abs(tx - sx)
+        dy = abs(ty - sy)
 
-        path.M(sx, sy)
-        path.C(c1x, c1y, c2x, c2y, tx, ty)
+        if needs_detour:
+            # Same-column vertical: route around via side with clear visual path
+            # Use effective bounds for outline children
+            src_x, src_y, src_w, src_h = get_effective_bounds(source_node)
+            tgt_x, tgt_y, tgt_w, tgt_h = get_effective_bounds(target_node)
+
+            detour_offset = 50  # How far to go sideways
+
+            if src_dir == "bottom":
+                # Going down: exit bottom-right, curve right, enter top-right
+                mid_x = max(src_x + src_w, tgt_x + tgt_w) + detour_offset
+
+                # Exit from bottom-right area of source
+                sx = src_x + src_w  # Right edge
+                sy = src_y + src_h  # Bottom edge
+
+                # Enter from top-right area of target
+                tx = tgt_x + tgt_w  # Right edge
+                ty = tgt_y  # Top edge
+
+                # Control points: go right then curve down
+                c1x, c1y = mid_x, sy
+                c2x, c2y = mid_x, ty
+            else:
+                # Going up: exit top-right, curve right, enter bottom-right
+                mid_x = max(src_x + src_w, tgt_x + tgt_w) + detour_offset
+
+                sx = src_x + src_w
+                sy = src_y  # Top edge
+
+                tx = tgt_x + tgt_w
+                ty = tgt_y + tgt_h  # Bottom edge
+
+                c1x, c1y = mid_x, sy
+                c2x, c2y = mid_x, ty
+
+            path.M(sx, sy)
+            path.C(c1x, c1y, c2x, c2y, tx, ty)
+
+        elif src_dir in ("left", "right"):
+            # Horizontal exit/entry - use horizontal control points
+            control_offset = max(50, dx * 0.5)
+
+            if src_dir == "right":
+                c1x, c1y = sx + control_offset, sy
+                c2x, c2y = tx - control_offset, ty
+            else:
+                c1x, c1y = sx - control_offset, sy
+                c2x, c2y = tx + control_offset, ty
+
+            path.M(sx, sy)
+            path.C(c1x, c1y, c2x, c2y, tx, ty)
+
+        else:
+            # Vertical exit/entry - use vertical control points
+            control_offset = max(50, dy * 0.5)
+
+            if src_dir == "bottom":
+                c1x, c1y = sx, sy + control_offset
+                c2x, c2y = tx, ty - control_offset
+            else:
+                c1x, c1y = sx, sy - control_offset
+                c2x, c2y = tx, ty + control_offset
+
+            path.M(sx, sy)
+            path.C(c1x, c1y, c2x, c2y, tx, ty)
 
         d.append(path)
 

@@ -3,6 +3,40 @@
 from specplot import diagram, node
 
 
+def sandwich_example():
+    """Create a sandwich layout example (3 rows: 1 zone, 3 zones, 1 zone)."""
+    with diagram(
+        filename="sandwich_example",
+        layout=(("LR",), ("TB", "TB", "TB"), ("LR",))
+    ):
+        # pos=1: top LR zone
+        user = node(icon="person", label="User", pos=1)
+
+        # pos=2,3,4: middle TB columns
+        api = node(icon="api", label="API Gateway", pos=2)
+        auth = node(icon="lock", label="Auth Service", pos=2)
+
+        svc = node(icon="dns", label="Core Service", pos=3)
+        cache = node(icon="memory", label="Cache", pos=3)
+
+        db = node(icon="database", label="Database", pos=4)
+        backup = node(icon="backup", label="Backup", pos=4)
+
+        # pos=5: bottom LR zone
+        logs = node(icon="description", label="Logs", pos=5)
+        metrics = node(icon="monitoring", label="Metrics", pos=5)
+
+        # Edges
+        user >> api >> svc >> db
+        api >> auth
+        svc >> cache
+        db >> backup
+        svc >> logs
+        svc >> metrics
+
+    print("Sandwich diagram saved to sandwich_example.svg")
+
+
 def main():
     """Create an example architecture diagram."""
     with diagram(filename="example"):
@@ -54,3 +88,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    sandwich_example()

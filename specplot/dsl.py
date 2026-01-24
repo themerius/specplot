@@ -42,6 +42,7 @@ def _parse_show_as(value: ShowAsLiteral | ShowAs) -> ShowAs:
 def diagram(
     filename: str = "diagram",
     title: str | None = None,
+    layout: tuple[tuple[str, ...], ...] | None = None,
     **kwargs: Any,
 ) -> Generator[Diagram]:
     """Create a diagram context.
@@ -52,15 +53,22 @@ def diagram(
             db = node(icon="database", label="Database")
             user >> db
 
+        # With zone layout:
+        with diagram(filename="zones", layout=(("LR",), ("TB", "TB"), ("LR",))):
+            node(icon="person", label="User", pos=1)
+            node(icon="api", label="API", pos=2)
+            node(icon="database", label="DB", pos=3)
+
     Args:
         filename: Output filename (without extension)
         title: Optional diagram title
+        layout: Zone layout as tuple of tuples, e.g., (("LR",), ("TB", "TB"), ("LR",))
         **kwargs: Additional diagram options
 
     Yields:
         The Diagram object
     """
-    d = Diagram(filename=filename, title=title, **kwargs)
+    d = Diagram(filename=filename, title=title, layout=layout, **kwargs)
     _diagram_stack.append(d)
 
     try:
@@ -127,6 +135,7 @@ def node(
     description: str | None = None,
     show_as: ShowAsLiteral | ShowAs = "outline",
     grid: tuple[int, int] | None = None,
+    pos: int | None = None,
     **kwargs: Any,
 ) -> NodeContext:
     """Create a node, optionally as a context for child nodes.
@@ -146,12 +155,16 @@ def node(
             node(icon="robot", label="Reader")
             writer = node(icon="robot", label="Writer")
 
+        # With zone position
+        node(icon="person", label="User", pos=1)
+
     Args:
         icon: Material Symbols icon name
         label: Node label text
         description: Optional description text
         show_as: "group" or "outline" for child display mode
         grid: Grid layout as (rows, cols) tuple
+        pos: Zone position (1-indexed) for zone-based layouts
         **kwargs: Additional node options
 
     Returns:
@@ -163,6 +176,7 @@ def node(
         description=description,
         show_as=_parse_show_as(show_as),
         grid=grid,
+        pos=pos,
         **kwargs,
     )
 

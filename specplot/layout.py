@@ -2,11 +2,84 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
     from .models import Diagram, Node
+
+
+@dataclass
+class Zone:
+    """A zone in the layout grid."""
+
+    direction: Literal["LR", "TB"]
+    row: int
+    col: int
+    zone_number: int  # 1-indexed
+    nodes: list[Node] = field(default_factory=list)
+    x: float = 0
+    y: float = 0
+    width: float = 0
+    height: float = 0
+
+
+def parse_layout(layout_spec: tuple[tuple[str, ...], ...]) -> list[Zone]:
+    """Parse tuple-of-tuples layout spec into Zone objects.
+
+    Args:
+        layout_spec: Layout like (("LR",), ("TB", "TB", "TB"), ("LR",))
+
+    Returns:
+        List of Zone objects with 1-indexed zone numbers
+    """
+    zones = []
+    zone_number = 1
+
+    for row_idx, row in enumerate(layout_spec):
+        for col_idx, direction in enumerate(row):
+            if direction not in ("LR", "TB"):
+                raise ValueError(f"Invalid direction '{direction}', must be 'LR' or 'TB'")
+            zones.append(Zone(
+                direction=direction,  # type: ignore
+                row=row_idx,
+                col=col_idx,
+                zone_number=zone_number,
+            ))
+            zone_number += 1
+
+    return zones
+
+
+def bucket_nodes_by_zone(nodes: list[Node], zones: list[Zone]) -> None:
+    """Assign nodes to zones based on their pos attribute.
+
+    Modifies zones in place, adding nodes to their nodes list.
+
+    Args:
+        nodes: List of nodes with pos attributes
+        zones: List of Zone objects to populate
+    """
+    zone_map = {z.zone_number: z for z in zones}
+    max_zone = len(zones)
+
+    for node in nodes:
+        if node.pos is None:
+            if max_zone == 1:
+                # Single zone: default to zone 1 for backwards compatibility
+                node.pos = 1
+            else:
+                raise ValueError(
+                    f"Node '{node.label}' has no pos attribute. "
+                    f"Multi-zone layouts require explicit pos (1-{max_zone})."
+                )
+
+        if node.pos < 1 or node.pos > max_zone:
+            raise ValueError(
+                f"Node '{node.label}' has pos={node.pos}, but valid range is 1-{max_zone}."
+            )
+
+        zone_map[node.pos].nodes.append(node)
 
 
 @dataclass
@@ -114,6 +187,7 @@ def layout_diagram(diagram: Diagram, config: LayoutConfig | None = None) -> None
     """Calculate positions for all nodes in a diagram.
 
     This modifies nodes in-place, setting their x, y, width, height attributes.
+    Supports zone-based layouts when diagram.layout is specified.
     """
     from .models import ShowAs
 
@@ -134,17 +208,102 @@ def layout_diagram(diagram: Diagram, config: LayoutConfig | None = None) -> None
     for node in diagram.nodes:
         calc_dims(node)
 
-    # Second pass: position top-level nodes
-    # Simple horizontal layout for now
-    x = diagram.padding
-    y = diagram.padding
-    max_height = 0.0
+    # Parse layout and bucket nodes
+    layout_spec = diagram.layout or (("LR",),)
+    zones = parse_layout(layout_spec)
+    bucket_nodes_by_zone(diagram.nodes, zones)
 
-    for node in diagram.nodes:
-        node.x = x
-        node.y = y
-        max_height = max(max_height, node.height)
-        x += node.width + config.node_spacing_h
+    # Calculate zone dimensions based on their nodes and direction
+    for zone in zones:
+        if not zone.nodes:
+            zone.width = 0
+            zone.height = 0
+            continue
+
+        if zone.direction == "LR":
+            # Horizontal: width = sum of node widths + spacing, height = max node height
+            zone.width = sum(n.width for n in zone.nodes) + config.node_spacing_h * (len(zone.nodes) - 1)
+            zone.height = max(n.height for n in zone.nodes)
+        else:  # TB
+            # Vertical: width = max node width, height = sum of node heights + spacing
+            zone.width = max(n.width for n in zone.nodes)
+            zone.height = sum(n.height for n in zone.nodes) + config.node_spacing_v * (len(zone.nodes) - 1)
+
+    # Position zones in the grid (row by row)
+    # First, calculate max columns per row and dimensions
+    rows_in_layout = {}
+    for zone in zones:
+        if zone.row not in rows_in_layout:
+            rows_in_layout[zone.row] = []
+        rows_in_layout[zone.row].append(zone)
+
+    # Calculate row heights and column widths
+    row_heights = {}
+    for row_idx, row_zones in rows_in_layout.items():
+        row_heights[row_idx] = max((z.height for z in row_zones if z.height > 0), default=0)
+
+    # For each row, calculate column widths
+    # But we need to align columns across rows for a grid effect
+    # Actually, zones in different rows may have different column counts
+    # So we calculate width per row and center each row
+
+    # Calculate total width per row
+    row_widths = {}
+    for row_idx, row_zones in rows_in_layout.items():
+        non_empty = [z for z in row_zones if z.width > 0]
+        if non_empty:
+            row_widths[row_idx] = sum(z.width for z in non_empty) + config.node_spacing_h * (len(non_empty) - 1)
+        else:
+            row_widths[row_idx] = 0
+
+    # Find max row width for centering
+    max_row_width = max(row_widths.values()) if row_widths else 0
+
+    # Position zones row by row
+    current_y = diagram.padding
+    for row_idx in sorted(rows_in_layout.keys()):
+        row_zones = rows_in_layout[row_idx]
+        row_height = row_heights[row_idx]
+        row_width = row_widths[row_idx]
+
+        # Skip empty rows
+        if row_height == 0:
+            continue
+
+        # Center this row horizontally
+        current_x = diagram.padding + (max_row_width - row_width) / 2
+
+        for zone in row_zones:
+            if zone.width == 0:
+                continue
+
+            zone.x = current_x
+            zone.y = current_y
+            current_x += zone.width + config.node_spacing_h
+
+        current_y += row_height + config.node_spacing_v
+
+    # Position nodes within zones
+    for zone in zones:
+        if not zone.nodes:
+            continue
+
+        if zone.direction == "LR":
+            # Horizontal layout: nodes side by side, vertically centered
+            x = zone.x
+            for node in zone.nodes:
+                node.x = x
+                # Vertically center within zone
+                node.y = zone.y + (zone.height - node.height) / 2
+                x += node.width + config.node_spacing_h
+        else:  # TB
+            # Vertical layout: nodes stacked, horizontally centered
+            y = zone.y
+            for node in zone.nodes:
+                # Horizontally center within zone
+                node.x = zone.x + (zone.width - node.width) / 2
+                node.y = y
+                y += node.height + config.node_spacing_v
 
     # Position children within their parents
     def position_children(parent: Node) -> None:
@@ -159,14 +318,14 @@ def layout_diagram(diagram: Diagram, config: LayoutConfig | None = None) -> None
             child_dims = [(c.width, c.height) for c in parent.children]
 
             col_widths = [0.0] * cols
-            row_heights = [0.0] * rows
+            row_heights_grid = [0.0] * rows
 
             for i, (cw, ch) in enumerate(child_dims):
                 row = i // cols
                 col = i % cols
                 if row < rows:
                     col_widths[col] = max(col_widths[col], cw)
-                    row_heights[row] = max(row_heights[row], ch)
+                    row_heights_grid[row] = max(row_heights_grid[row], ch)
 
             # Starting position inside parent
             start_y = parent.y + config.group_header_height
@@ -188,7 +347,7 @@ def layout_diagram(diagram: Diagram, config: LayoutConfig | None = None) -> None
                         # Recursively position grandchildren
                         position_children(child)
                     current_x += col_widths[col] + config.node_spacing_h
-                current_y += row_heights[row] + config.node_spacing_v
+                current_y += row_heights_grid[row] + config.node_spacing_v
 
     for node in diagram.nodes:
         position_children(node)

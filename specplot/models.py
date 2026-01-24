@@ -55,6 +55,7 @@ class Node:
     description: str | None = None
     show_as: ShowAs = ShowAs.OUTLINE
     grid: tuple[int, int] | None = None
+    pos: int | None = None  # Zone position (1-indexed)
     children: list[Node] = field(default_factory=list)
     outline: list[OutlineItem] = field(default_factory=list)
     _parent: Node | None = field(default=None, repr=False)
@@ -71,6 +72,7 @@ class Node:
         edge = Edge(source=self, target=other, style=EdgeStyle.ARROW_RIGHT)
         if self._diagram:
             self._diagram.edges.append(edge)
+            edge._diagram = self._diagram
         return edge
 
     def __lshift__(self, other: Node | OutlineItem) -> Edge:
@@ -78,6 +80,7 @@ class Node:
         edge = Edge(source=other, target=self, style=EdgeStyle.ARROW_RIGHT)
         if self._diagram:
             self._diagram.edges.append(edge)
+            edge._diagram = self._diagram
         return edge
 
     def __sub__(self, other: Node | OutlineItem) -> Edge:
@@ -85,6 +88,7 @@ class Node:
         edge = Edge(source=self, target=other, style=EdgeStyle.LINE)
         if self._diagram:
             self._diagram.edges.append(edge)
+            edge._diagram = self._diagram
         return edge
 
 
@@ -105,9 +109,12 @@ class Edge:
 
     def __rshift__(self, other: Node | OutlineItem) -> Edge:
         """Chain edges: a >> b >> c."""
-        new_edge = Edge(source=self.target, target=other, style=self.style)
+        # Unwrap NodeContext if needed (duck-typing to avoid circular import)
+        target = getattr(other, "_node", other)
+        new_edge = Edge(source=self.target, target=target, style=self.style)
         if self._diagram:
             self._diagram.edges.append(new_edge)
+            new_edge._diagram = self._diagram
         return new_edge
 
 
@@ -117,6 +124,7 @@ class Diagram:
 
     filename: str = "diagram"
     title: str | None = None
+    layout: tuple[tuple[str, ...], ...] | None = None  # Zone layout specification
     nodes: list[Node] = field(default_factory=list)
     edges: list[Edge] = field(default_factory=list)
     padding: float = 40
