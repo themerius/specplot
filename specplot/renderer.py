@@ -229,17 +229,17 @@ class EdgeRouter:
         geo_tgt = self._detect_best_side(src_node, tgt_node, is_source=False)
 
         for src_side in sides:
-            # Get snapping point for source
+            # Get snapping point for source (outgoing edge - no entry restriction)
             src_snap = self._grid.select_snapping_point(
-                src_node, src_side, set(), target_y=src_target_y
+                src_node, src_side, set(), target_y=src_target_y, is_target=False
             )
             if not src_snap:
                 continue
 
             for tgt_side in sides:
-                # Get snapping point for target
+                # Get snapping point for target (incoming edge - respect no_entry)
                 tgt_snap = self._grid.select_snapping_point(
-                    tgt_node, tgt_side, set(), target_y=tgt_target_y
+                    tgt_node, tgt_side, set(), target_y=tgt_target_y, is_target=True
                 )
                 if not tgt_snap:
                     continue
@@ -605,24 +605,25 @@ class EdgeRouter:
             tgt_slot = edge_tgt_slots.get(edge_idx, 0)
 
             # Select snapping points using distributed selection
+            # Source = outgoing edge (is_target=False), Target = incoming edge (is_target=True)
             if src_target_y is not None:
                 # Outline item - use specific y position
                 src_snap = self._grid.select_snapping_point(
-                    src_node, src_side, set(), target_y=src_target_y
+                    src_node, src_side, set(), target_y=src_target_y, is_target=False
                 )
             else:
                 src_snap = self._grid.select_distributed_snapping_point(
-                    src_node, src_side, src_slot, src_total
+                    src_node, src_side, src_slot, src_total, is_target=False
                 )
 
             if tgt_target_y is not None:
                 # Outline item - use specific y position
                 tgt_snap = self._grid.select_snapping_point(
-                    tgt_node, tgt_side, set(), target_y=tgt_target_y
+                    tgt_node, tgt_side, set(), target_y=tgt_target_y, is_target=True
                 )
             else:
                 tgt_snap = self._grid.select_distributed_snapping_point(
-                    tgt_node, tgt_side, tgt_slot, tgt_total
+                    tgt_node, tgt_side, tgt_slot, tgt_total, is_target=True
                 )
 
             if not src_snap or not tgt_snap:
@@ -913,27 +914,35 @@ class DiagramRenderer:
         for node_id, sides in grid._snapping_points.items():
             for side, points in sides.items():
                 for i, vnode in enumerate(points):
-                    # Color based on position (center = green, edges = blue)
-                    # Use snapping weight to determine color intensity
-                    weight = vnode.snapping_weight
-                    if weight < 0.3:
-                        # Near center - green
-                        fill = "#22c55e"
+                    # Check if this is a no_entry point (header zone - forbidden entry)
+                    if vnode.no_entry:
+                        # No-entry points - black (as in the diagram)
+                        fill = "#1f2937"  # Dark gray/black
                         radius = 4
-                    elif weight < 0.6:
-                        # Mid - teal
-                        fill = "#14b8a6"
-                        radius = 3.5
+                        stroke = "#ef4444"  # Red stroke to indicate forbidden
                     else:
-                        # Far from center - blue
-                        fill = "#3b82f6"
-                        radius = 3
+                        # Color based on position (center = green, edges = blue)
+                        # Use snapping weight to determine color intensity
+                        weight = vnode.snapping_weight
+                        if weight < 0.3:
+                            # Near center - green
+                            fill = "#22c55e"
+                            radius = 4
+                        elif weight < 0.6:
+                            # Mid - teal
+                            fill = "#14b8a6"
+                            radius = 3.5
+                        else:
+                            # Far from center - blue
+                            fill = "#3b82f6"
+                            radius = 3
+                        stroke = "#ffffff"
 
                     snapping_group.append(
                         draw.Circle(
                             vnode.x, vnode.y, radius,
                             fill=fill,
-                            stroke="#ffffff",
+                            stroke=stroke,
                             stroke_width=0.5,
                         )
                     )

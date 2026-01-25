@@ -49,6 +49,7 @@ class VirtualNode:
     attached_node: Node | None = None
     attachment_side: str | None = None  # "left", "right", "top", "bottom"
     snapping_weight: float = 1.0  # Lower is better for snapping
+    no_entry: bool = False  # If True, edges cannot use this as a target (entry point)
 
 
 @dataclass
@@ -81,6 +82,7 @@ class VirtualGrid:
         self.nodes: dict[tuple[int, int], VirtualNode] = {}
         self.graph: nx.Graph = nx.Graph()
         self._node_obstacles: list[tuple[float, float, float, float]] = []
+        self._header_zones: list[tuple[float, float, float, float]] = []  # For soft penalty
         self._snapping_points: dict[int, dict[str, list[VirtualNode]]] = {}
 
     @classmethod
@@ -201,7 +203,16 @@ class VirtualGrid:
                 if node.description:
                     header_bottom += DESCRIPTION_HEIGHT
 
-                # Block the header zone
+                # Track header zone for soft penalty (not hard blocking)
+                # This allows paths through but with high cost
+                self._header_zones.append((
+                    node.x,
+                    node.y,
+                    node.x + node.width,
+                    header_bottom,
+                ))
+
+                # Block the header zone (minimal blocking, just the label area)
                 self._node_obstacles.append((
                     node.x - margin,
                     node.y - margin,
@@ -349,6 +360,23 @@ class VirtualGrid:
             penalty = self.config.proximity_penalty_weight * (margin - min_dist) / margin
             weight *= (1 + penalty)
 
+        # Apply HIGH penalty for paths crossing through group header zones
+        # This is a soft constraint - paths CAN go through but strongly prefer not to
+        for hx1, hy1, hx2, hy2 in self._header_zones:
+            # Check if midpoint is inside or very near the header zone
+            in_header_x = hx1 - margin < mid_x < hx2 + margin
+            in_header_y = hy1 - margin < mid_y < hy2 + margin
+
+            if in_header_x and in_header_y:
+                # Strong penalty for being in/near header zone (10x base cost)
+                # The closer to the center of the header, the higher the penalty
+                header_center_y = (hy1 + hy2) / 2
+                dist_from_center = abs(mid_y - header_center_y)
+                header_height = hy2 - hy1
+                # Max penalty at center, decreasing towards edges
+                intensity = 1.0 - min(1.0, dist_from_center / (header_height + margin))
+                weight *= (1 + 10.0 * intensity)
+
         return weight
 
     def _compute_snapping_points(self, diagram: Diagram) -> None:
@@ -423,15 +451,14 @@ class VirtualGrid:
                 self._snapping_points[node_id]["left"].append(vnode)
 
             # Right side - points exactly at x = node.x + node.width
-            # For groups: only below header+description area
+            # For groups: points in header zone are marked no_entry
             for i in range(num_points_v):
                 t = (i + 0.5) / num_points_v
                 y = node.y + t * node.height
                 x = node.x + node.width  # Exactly on the border
 
-                # Skip points in header zone for group nodes
-                if is_group and y < header_zone_bottom:
-                    continue
+                # Check if this point is in header zone for group nodes
+                in_header_zone = is_group and y < header_zone_bottom
 
                 grid_pos = self.get_nearest_grid_point(x + grid_offset, y)
                 if grid_pos is None:
@@ -455,10 +482,12 @@ class VirtualGrid:
                     grid_row=grid_pos[0], grid_col=grid_pos[1],
                     is_boundary=True, attached_node=node,
                     attachment_side="right", snapping_weight=1 - weight,
+                    no_entry=in_header_zone,  # Header zone points are no-entry
                 )
                 self._snapping_points[node_id]["right"].append(vnode)
 
             # Top side - points exactly at y = node.y
+            # For groups: ALL top snapping points are no_entry (header zone)
             for i in range(num_points_h):
                 t = (i + 0.5) / num_points_h
                 x = node.x + t * node.width
@@ -478,6 +507,7 @@ class VirtualGrid:
                     grid_row=grid_pos[0], grid_col=grid_pos[1],
                     is_boundary=True, attached_node=node,
                     attachment_side="top", snapping_weight=1 - weight,
+                    no_entry=is_group,  # Group nodes: top side is header zone (no entry)
                 )
                 self._snapping_points[node_id]["top"].append(vnode)
 
@@ -660,6 +690,7 @@ class VirtualGrid:
         side: str,
         occupied: set[tuple[int, int]],
         target_y: float | None = None,
+        is_target: bool = False,
     ) -> VirtualNode | None:
         """Select best snapping point for a node side.
 
@@ -668,6 +699,7 @@ class VirtualGrid:
             side: Which side ("left", "right", "top", "bottom")
             occupied: Set of already-occupied grid positions
             target_y: Optional target y coordinate (for outline item connections)
+            is_target: If True, this is for an incoming edge (filter no_entry points)
 
         Returns:
             Best available VirtualNode for snapping
@@ -678,6 +710,10 @@ class VirtualGrid:
 
         candidates = self._snapping_points[node_id].get(side, [])
 
+        # Filter out no_entry points when selecting for target (incoming edge)
+        if is_target:
+            candidates = [v for v in candidates if not v.no_entry]
+
         # Filter out occupied positions
         available = [
             v for v in candidates
@@ -685,8 +721,8 @@ class VirtualGrid:
         ]
 
         if not available:
-            # Fall back to any candidate if all occupied
-            available = candidates
+            # Fall back to any candidate if all occupied (but still respect no_entry)
+            available = candidates if not is_target else [v for v in candidates if not v.no_entry]
 
         if not available:
             return None
@@ -706,6 +742,7 @@ class VirtualGrid:
         side: str,
         edge_index: int,
         total_edges: int,
+        is_target: bool = False,
     ) -> VirtualNode | None:
         """Select snapping point using Gaussian distribution for multiple edges.
 
@@ -721,6 +758,7 @@ class VirtualGrid:
             side: Which side ("left", "right", "top", "bottom")
             edge_index: Index of this edge (0-based, sorted by source position)
             total_edges: Total number of edges on this side
+            is_target: If True, this is for an incoming edge (filter no_entry points)
 
         Returns:
             VirtualNode at the distributed position
@@ -730,6 +768,11 @@ class VirtualGrid:
             return None
 
         candidates = self._snapping_points[node_id].get(side, [])
+
+        # Filter out no_entry points when selecting for target (incoming edge)
+        if is_target:
+            candidates = [v for v in candidates if not v.no_entry]
+
         if not candidates:
             return None
 
