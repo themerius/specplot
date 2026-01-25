@@ -270,8 +270,14 @@ class VirtualGrid:
         return weight
 
     def _compute_snapping_points(self, diagram: Diagram) -> None:
-        """Compute weighted snapping points for each node."""
+        """Compute snapping points exactly on each node's border.
+
+        Creates virtual nodes positioned exactly on the node edges,
+        with positions distributed along the side for multi-edge support.
+        """
         from .models import ShowAs
+
+        spacing = self.config.grid_spacing
 
         def process_node(node: Node) -> None:
             node_id = id(node)
@@ -282,66 +288,113 @@ class VirtualGrid:
                 "bottom": [],
             }
 
-            # Find boundary nodes adjacent to each side
-            for (row, col), vnode in self.nodes.items():
-                if vnode.is_blocked:
-                    continue
+            # Create snapping points exactly on borders
+            # Number of points per side based on side length
+            num_points_v = max(3, int(node.height / spacing))
+            num_points_h = max(3, int(node.width / spacing))
 
-                x, y = vnode.x, vnode.y
-                spacing = self.config.grid_spacing
+            # Left side - points exactly at x = node.x
+            for i in range(num_points_v):
+                # Distribute points along the height
+                t = (i + 0.5) / num_points_v  # 0.5 offset to avoid corners
+                y = node.y + t * node.height
+                x = node.x  # Exactly on the border
 
-                # Check proximity to each side
-                # Left side
-                if abs(x - node.x) < spacing * 1.5 and node.y <= y <= node.y + node.height:
-                    distance_from_center = abs(y - (node.y + node.height / 2))
-                    sigma = node.height / 4
-                    weight = math.exp(-(distance_from_center ** 2) / (2 * sigma ** 2))
-                    vnode_copy = VirtualNode(
-                        x=x, y=y, grid_row=row, grid_col=col,
-                        is_boundary=True, attached_node=node,
-                        attachment_side="left", snapping_weight=1 - weight,
-                    )
-                    self._snapping_points[node_id]["left"].append(vnode_copy)
+                # Find nearest grid point for pathfinding
+                grid_pos = self.get_nearest_grid_point(x - spacing, y)
+                if grid_pos is None:
+                    grid_pos = (0, 0)
 
-                # Right side
-                if abs(x - (node.x + node.width)) < spacing * 1.5 and node.y <= y <= node.y + node.height:
-                    distance_from_center = abs(y - (node.y + node.height / 2))
-                    sigma = node.height / 4
-                    weight = math.exp(-(distance_from_center ** 2) / (2 * sigma ** 2))
-                    vnode_copy = VirtualNode(
-                        x=x, y=y, grid_row=row, grid_col=col,
-                        is_boundary=True, attached_node=node,
-                        attachment_side="right", snapping_weight=1 - weight,
-                    )
-                    self._snapping_points[node_id]["right"].append(vnode_copy)
+                # Weight based on distance from center (Gaussian)
+                center_y = node.y + node.height / 2
+                distance_from_center = abs(y - center_y)
+                sigma = node.height / 6  # sigma = side_length / 6
+                weight = math.exp(-(distance_from_center ** 2) / (2 * sigma ** 2))
 
-                # Top side
-                if abs(y - node.y) < spacing * 1.5 and node.x <= x <= node.x + node.width:
-                    distance_from_center = abs(x - (node.x + node.width / 2))
-                    sigma = node.width / 4
-                    weight = math.exp(-(distance_from_center ** 2) / (2 * sigma ** 2))
-                    vnode_copy = VirtualNode(
-                        x=x, y=y, grid_row=row, grid_col=col,
-                        is_boundary=True, attached_node=node,
-                        attachment_side="top", snapping_weight=1 - weight,
-                    )
-                    self._snapping_points[node_id]["top"].append(vnode_copy)
+                vnode = VirtualNode(
+                    x=x, y=y,
+                    grid_row=grid_pos[0], grid_col=grid_pos[1],
+                    is_boundary=True, attached_node=node,
+                    attachment_side="left", snapping_weight=1 - weight,
+                )
+                self._snapping_points[node_id]["left"].append(vnode)
 
-                # Bottom side
-                if abs(y - (node.y + node.height)) < spacing * 1.5 and node.x <= x <= node.x + node.width:
-                    distance_from_center = abs(x - (node.x + node.width / 2))
-                    sigma = node.width / 4
-                    weight = math.exp(-(distance_from_center ** 2) / (2 * sigma ** 2))
-                    vnode_copy = VirtualNode(
-                        x=x, y=y, grid_row=row, grid_col=col,
-                        is_boundary=True, attached_node=node,
-                        attachment_side="bottom", snapping_weight=1 - weight,
-                    )
-                    self._snapping_points[node_id]["bottom"].append(vnode_copy)
+            # Right side - points exactly at x = node.x + node.width
+            for i in range(num_points_v):
+                t = (i + 0.5) / num_points_v
+                y = node.y + t * node.height
+                x = node.x + node.width  # Exactly on the border
 
-            # Sort snapping points by weight (lower is better)
-            for side in self._snapping_points[node_id]:
-                self._snapping_points[node_id][side].sort(key=lambda v: v.snapping_weight)
+                grid_pos = self.get_nearest_grid_point(x + spacing, y)
+                if grid_pos is None:
+                    grid_pos = (0, 0)
+
+                center_y = node.y + node.height / 2
+                distance_from_center = abs(y - center_y)
+                sigma = node.height / 6
+                weight = math.exp(-(distance_from_center ** 2) / (2 * sigma ** 2))
+
+                vnode = VirtualNode(
+                    x=x, y=y,
+                    grid_row=grid_pos[0], grid_col=grid_pos[1],
+                    is_boundary=True, attached_node=node,
+                    attachment_side="right", snapping_weight=1 - weight,
+                )
+                self._snapping_points[node_id]["right"].append(vnode)
+
+            # Top side - points exactly at y = node.y
+            for i in range(num_points_h):
+                t = (i + 0.5) / num_points_h
+                x = node.x + t * node.width
+                y = node.y  # Exactly on the border
+
+                grid_pos = self.get_nearest_grid_point(x, y - spacing)
+                if grid_pos is None:
+                    grid_pos = (0, 0)
+
+                center_x = node.x + node.width / 2
+                distance_from_center = abs(x - center_x)
+                sigma = node.width / 6
+                weight = math.exp(-(distance_from_center ** 2) / (2 * sigma ** 2))
+
+                vnode = VirtualNode(
+                    x=x, y=y,
+                    grid_row=grid_pos[0], grid_col=grid_pos[1],
+                    is_boundary=True, attached_node=node,
+                    attachment_side="top", snapping_weight=1 - weight,
+                )
+                self._snapping_points[node_id]["top"].append(vnode)
+
+            # Bottom side - points exactly at y = node.y + node.height
+            for i in range(num_points_h):
+                t = (i + 0.5) / num_points_h
+                x = node.x + t * node.width
+                y = node.y + node.height  # Exactly on the border
+
+                grid_pos = self.get_nearest_grid_point(x, y + spacing)
+                if grid_pos is None:
+                    grid_pos = (0, 0)
+
+                center_x = node.x + node.width / 2
+                distance_from_center = abs(x - center_x)
+                sigma = node.width / 6
+                weight = math.exp(-(distance_from_center ** 2) / (2 * sigma ** 2))
+
+                vnode = VirtualNode(
+                    x=x, y=y,
+                    grid_row=grid_pos[0], grid_col=grid_pos[1],
+                    is_boundary=True, attached_node=node,
+                    attachment_side="bottom", snapping_weight=1 - weight,
+                )
+                self._snapping_points[node_id]["bottom"].append(vnode)
+
+            # Sort snapping points by position (for consistent distribution)
+            # Left/right: sort by y position
+            self._snapping_points[node_id]["left"].sort(key=lambda v: v.y)
+            self._snapping_points[node_id]["right"].sort(key=lambda v: v.y)
+            # Top/bottom: sort by x position
+            self._snapping_points[node_id]["top"].sort(key=lambda v: v.x)
+            self._snapping_points[node_id]["bottom"].sort(key=lambda v: v.x)
 
             # Process children for groups
             if node.children and node.show_as == ShowAs.GROUP:
@@ -434,6 +487,84 @@ class VirtualGrid:
             available.sort(key=lambda v: v.snapping_weight)
 
         return available[0] if available else None
+
+    def select_distributed_snapping_point(
+        self,
+        node: Node,
+        side: str,
+        edge_index: int,
+        total_edges: int,
+    ) -> VirtualNode | None:
+        """Select snapping point using Gaussian distribution for multiple edges.
+
+        Distributes edges along the side using sigma-based positions:
+        - 1 edge: center (0 sigma)
+        - 2 edges: -1 sigma, +1 sigma
+        - 3 edges: -1 sigma, 0, +1 sigma
+        - 4 edges: -1.5 sigma, -0.5 sigma, +0.5 sigma, +1.5 sigma
+        - etc.
+
+        Args:
+            node: The node to snap to
+            side: Which side ("left", "right", "top", "bottom")
+            edge_index: Index of this edge (0-based, sorted by source position)
+            total_edges: Total number of edges on this side
+
+        Returns:
+            VirtualNode at the distributed position
+        """
+        node_id = id(node)
+        if node_id not in self._snapping_points:
+            return None
+
+        candidates = self._snapping_points[node_id].get(side, [])
+        if not candidates:
+            return None
+
+        # Calculate the target position based on Gaussian distribution
+        # sigma = side_length / 6, so we have ~3 sigma on each side of center
+        if side in ("left", "right"):
+            side_length = node.height
+            center = node.y + node.height / 2
+        else:
+            side_length = node.width
+            center = node.x + node.width / 2
+
+        sigma = side_length / 6
+
+        # Calculate the sigma offset for this edge
+        if total_edges == 1:
+            sigma_offset = 0
+        else:
+            # Distribute edges symmetrically around center
+            # For n edges, use positions: -(n-1)/2, ..., -0.5, 0.5, ..., (n-1)/2 for even
+            # Or: -(n-1)/2, ..., -1, 0, 1, ..., (n-1)/2 for odd
+            half = (total_edges - 1) / 2
+            sigma_offset = (edge_index - half)
+
+        # Calculate target coordinate
+        target_offset = sigma_offset * sigma
+        if side in ("left", "right"):
+            target_pos = center + target_offset
+            # Find closest snapping point by y position
+            candidates_sorted = sorted(candidates, key=lambda v: abs(v.y - target_pos))
+        else:
+            target_pos = center + target_offset
+            # Find closest snapping point by x position
+            candidates_sorted = sorted(candidates, key=lambda v: abs(v.x - target_pos))
+
+        return candidates_sorted[0] if candidates_sorted else None
+
+    def get_snapping_points_for_side(
+        self,
+        node: Node,
+        side: str,
+    ) -> list[VirtualNode]:
+        """Get all snapping points for a node side."""
+        node_id = id(node)
+        if node_id not in self._snapping_points:
+            return []
+        return self._snapping_points[node_id].get(side, [])
 
     def get_nearest_grid_point(
         self,
@@ -603,3 +734,102 @@ def extract_orthogonal_waypoints(
         current = next_point
 
     return result
+
+
+def compute_path_center(
+    points: list[tuple[float, float]],
+) -> tuple[float, float]:
+    """Compute the center point of a path using arc length.
+
+    Finds the point that is equidistant (by path length) from both endpoints.
+
+    Args:
+        points: List of path points
+
+    Returns:
+        (x, y) coordinates of the path center
+    """
+    if len(points) < 2:
+        return points[0] if points else (0, 0)
+
+    if len(points) == 2:
+        return (
+            (points[0][0] + points[1][0]) / 2,
+            (points[0][1] + points[1][1]) / 2,
+        )
+
+    # Calculate cumulative arc lengths
+    arc_lengths = [0.0]
+    for i in range(1, len(points)):
+        dx = points[i][0] - points[i - 1][0]
+        dy = points[i][1] - points[i - 1][1]
+        segment_length = math.sqrt(dx * dx + dy * dy)
+        arc_lengths.append(arc_lengths[-1] + segment_length)
+
+    total_length = arc_lengths[-1]
+    if total_length == 0:
+        return points[0]
+
+    target_length = total_length / 2
+
+    # Find the segment containing the center
+    for i in range(1, len(arc_lengths)):
+        if arc_lengths[i] >= target_length:
+            # Interpolate within this segment
+            segment_start = arc_lengths[i - 1]
+            segment_end = arc_lengths[i]
+            segment_length = segment_end - segment_start
+
+            if segment_length == 0:
+                return points[i - 1]
+
+            t = (target_length - segment_start) / segment_length
+            x = points[i - 1][0] + t * (points[i][0] - points[i - 1][0])
+            y = points[i - 1][1] + t * (points[i][1] - points[i - 1][1])
+            return (x, y)
+
+    # Fallback to last point
+    return points[-1]
+
+
+def compute_bezier_path_center(
+    control_points: list[tuple[float, float]],
+) -> tuple[float, float]:
+    """Compute the center point of a Bezier path.
+
+    Samples the Bezier curve and finds the point at t=0.5 of total arc length.
+
+    Args:
+        control_points: Bezier control points (start, c1, c2, end, c1, c2, end, ...)
+
+    Returns:
+        (x, y) coordinates of the path center
+    """
+    if len(control_points) < 4:
+        return compute_path_center(list(control_points))
+
+    # Sample the Bezier curve to get approximate points
+    sample_points = []
+    num_segments = (len(control_points) - 1) // 3
+
+    for seg in range(num_segments):
+        base = seg * 3
+        if base + 3 >= len(control_points):
+            break
+
+        p0 = control_points[base]
+        c1 = control_points[base + 1]
+        c2 = control_points[base + 2]
+        p3 = control_points[base + 3]
+
+        # Sample this segment
+        samples_per_segment = 10
+        for i in range(samples_per_segment + 1):
+            t = i / samples_per_segment
+            # Cubic Bezier formula
+            mt = 1 - t
+            x = mt**3 * p0[0] + 3 * mt**2 * t * c1[0] + 3 * mt * t**2 * c2[0] + t**3 * p3[0]
+            y = mt**3 * p0[1] + 3 * mt**2 * t * c1[1] + 3 * mt * t**2 * c2[1] + t**3 * p3[1]
+            sample_points.append((x, y))
+
+    return compute_path_center(sample_points)

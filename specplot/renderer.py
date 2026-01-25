@@ -19,6 +19,8 @@ from .pathfinding import (
     RoutedPath,
     VirtualGrid,
     compute_bezier_control_points,
+    compute_bezier_path_center,
+    compute_path_center,
     extract_orthogonal_waypoints,
     simplify_path_douglas_peucker,
 )
@@ -390,13 +392,20 @@ class EdgeRouter:
                         self._assigned_points[edge_id]["target"] = (cx, cy, side, needs_detour)
 
     def _analyze_edges_intelligent(self) -> None:
-        """Analyze edges using A* pathfinding for intelligent routing."""
+        """Analyze edges using A* pathfinding with Gaussian-distributed snapping.
+
+        Uses two-pass algorithm:
+        1. Group edges by (node, side) and sort by source position
+        2. Assign snapping points using sigma-based distribution
+        """
         from .models import Node, OutlineItem, ShowAs
 
         if not self._grid:
             return
 
-        occupied: set[tuple[int, int]] = set()
+        # First pass: collect edge info and group by node+side
+        edge_infos = []  # List of edge analysis data
+        node_side_edges: dict[tuple[int, str], list[int]] = {}  # (node_id, side) -> [edge_info indices]
 
         for edge in self.diagram.edges:
             # Get source and target nodes
@@ -421,11 +430,8 @@ class EdgeRouter:
             if src_node is None or tgt_node is None:
                 continue
 
-            # Determine best sides for connection
-            src_side = self._detect_best_side(src_node, tgt_node, is_source=True)
-            tgt_side = self._detect_best_side(src_node, tgt_node, is_source=False)
-
-            # Get snapping points
+            # Handle outline item connections - use parent for snapping
+            src_snap_node = src_node
             src_target_y = None
             if src_outline_idx is not None and src_node._parent:
                 parent = src_node._parent
@@ -433,8 +439,9 @@ class EdgeRouter:
                 if parent.description:
                     base_y += self.config.description_height
                 src_target_y = base_y + src_outline_idx * self.config.outline_item_height + self.config.outline_item_height / 2
-                src_node = parent  # Use parent for snapping
+                src_snap_node = parent
 
+            tgt_snap_node = tgt_node
             tgt_target_y = None
             if tgt_outline_idx is not None and tgt_node._parent:
                 parent = tgt_node._parent
@@ -442,14 +449,105 @@ class EdgeRouter:
                 if parent.description:
                     base_y += self.config.description_height
                 tgt_target_y = base_y + tgt_outline_idx * self.config.outline_item_height + self.config.outline_item_height / 2
-                tgt_node = parent  # Use parent for snapping
+                tgt_snap_node = parent
 
-            src_snap = self._grid.select_snapping_point(
-                src_node, src_side, occupied, target_y=src_target_y
-            )
-            tgt_snap = self._grid.select_snapping_point(
-                tgt_node, tgt_side, occupied, target_y=tgt_target_y
-            )
+            # Determine best sides for connection
+            src_side = self._detect_best_side(src_snap_node, tgt_snap_node, is_source=True)
+            tgt_side = self._detect_best_side(src_snap_node, tgt_snap_node, is_source=False)
+
+            # Get source center for sorting
+            src_cx = src_snap_node.x + src_snap_node.width / 2
+            src_cy = src_snap_node.y + src_snap_node.height / 2
+
+            edge_info = {
+                "edge": edge,
+                "src_node": src_snap_node,
+                "tgt_node": tgt_snap_node,
+                "src_side": src_side,
+                "tgt_side": tgt_side,
+                "src_target_y": src_target_y,
+                "tgt_target_y": tgt_target_y,
+                "src_cx": src_cx,
+                "src_cy": src_cy,
+            }
+            edge_idx = len(edge_infos)
+            edge_infos.append(edge_info)
+
+            # Group by source node+side
+            src_key = (id(src_snap_node), src_side)
+            if src_key not in node_side_edges:
+                node_side_edges[src_key] = []
+            node_side_edges[src_key].append(edge_idx)
+
+            # Group by target node+side
+            tgt_key = (id(tgt_snap_node), tgt_side)
+            if tgt_key not in node_side_edges:
+                node_side_edges[tgt_key] = []
+            node_side_edges[tgt_key].append(edge_idx)
+
+        # Sort edges in each group by source position (to minimize crossings)
+        for key, indices in node_side_edges.items():
+            node_id, side = key
+            if side in ("left", "right"):
+                # Sort by source y position
+                indices.sort(key=lambda i: edge_infos[i]["src_cy"])
+            else:
+                # Sort by source x position
+                indices.sort(key=lambda i: edge_infos[i]["src_cx"])
+
+        # Second pass: assign snapping points using distributed selection
+        # Track which slot each edge uses for each node+side
+        edge_src_slots: dict[int, int] = {}  # edge_idx -> slot index for source
+        edge_tgt_slots: dict[int, int] = {}  # edge_idx -> slot index for target
+
+        for key, indices in node_side_edges.items():
+            node_id, side = key
+            for slot_idx, edge_idx in enumerate(indices):
+                info = edge_infos[edge_idx]
+                # Check if this is source or target for this node
+                if id(info["src_node"]) == node_id and info["src_side"] == side:
+                    edge_src_slots[edge_idx] = slot_idx
+                if id(info["tgt_node"]) == node_id and info["tgt_side"] == side:
+                    edge_tgt_slots[edge_idx] = slot_idx
+
+        # Third pass: compute paths
+        for edge_idx, info in enumerate(edge_infos):
+            edge = info["edge"]
+            src_node = info["src_node"]
+            tgt_node = info["tgt_node"]
+            src_side = info["src_side"]
+            tgt_side = info["tgt_side"]
+            src_target_y = info["src_target_y"]
+            tgt_target_y = info["tgt_target_y"]
+
+            # Get edge counts for distribution
+            src_key = (id(src_node), src_side)
+            tgt_key = (id(tgt_node), tgt_side)
+            src_total = len(node_side_edges.get(src_key, []))
+            tgt_total = len(node_side_edges.get(tgt_key, []))
+            src_slot = edge_src_slots.get(edge_idx, 0)
+            tgt_slot = edge_tgt_slots.get(edge_idx, 0)
+
+            # Select snapping points using distributed selection
+            if src_target_y is not None:
+                # Outline item - use specific y position
+                src_snap = self._grid.select_snapping_point(
+                    src_node, src_side, set(), target_y=src_target_y
+                )
+            else:
+                src_snap = self._grid.select_distributed_snapping_point(
+                    src_node, src_side, src_slot, src_total
+                )
+
+            if tgt_target_y is not None:
+                # Outline item - use specific y position
+                tgt_snap = self._grid.select_snapping_point(
+                    tgt_node, tgt_side, set(), target_y=tgt_target_y
+                )
+            else:
+                tgt_snap = self._grid.select_distributed_snapping_point(
+                    tgt_node, tgt_side, tgt_slot, tgt_total
+                )
 
             if not src_snap or not tgt_snap:
                 # Fall back to center-to-center
@@ -464,18 +562,18 @@ class EdgeRouter:
                 )
                 continue
 
-            # Mark as occupied
-            occupied.add((src_snap.grid_row, src_snap.grid_col))
-            occupied.add((tgt_snap.grid_row, tgt_snap.grid_col))
-
             # Find path using A*
             start = (src_snap.grid_row, src_snap.grid_col)
             end = (tgt_snap.grid_row, tgt_snap.grid_col)
             path_points = self._grid.find_path(start, end)
 
             if path_points is None:
-                # No path found - use direct line
+                # No path found - use direct line from border points
                 path_points = [(src_snap.x, src_snap.y), (tgt_snap.x, tgt_snap.y)]
+            else:
+                # Replace first and last points with exact border positions
+                path_points[0] = (src_snap.x, src_snap.y)
+                path_points[-1] = (tgt_snap.x, tgt_snap.y)
 
             # Process path based on style
             if self.pathfinding_config and self.pathfinding_config.path_style == "orthogonal":
@@ -1021,27 +1119,14 @@ class DiagramRenderer:
             angle = math.atan2(sy - first_control_y, sx - first_control_x)
             self._draw_arrowhead(d, sx, sy, angle, arrow_size)
 
-        # Draw label if present (positioned at path midpoint)
+        # Draw label if present (positioned at true path center using arc length)
         if edge.label:
-            # Find approximate midpoint of the path
-            mid_idx = len(points) // 2
             if routed_path.control_points and len(routed_path.control_points) >= 4:
-                # Use Bezier midpoint for smooth paths
-                cps = routed_path.control_points
-                # Find the middle segment
-                mid_seg = len(cps) // 4
-                if mid_seg * 3 + 2 < len(cps):
-                    p0 = cps[mid_seg * 3]
-                    c1 = cps[mid_seg * 3 + 1]
-                    c2 = cps[mid_seg * 3 + 2]
-                    p3 = cps[min(mid_seg * 3 + 3, len(cps) - 1)]
-                    t = 0.5
-                    mid_x = (1-t)**3 * p0[0] + 3*(1-t)**2*t * c1[0] + 3*(1-t)*t**2 * c2[0] + t**3 * p3[0]
-                    mid_y = (1-t)**3 * p0[1] + 3*(1-t)**2*t * c1[1] + 3*(1-t)*t**2 * c2[1] + t**3 * p3[1]
-                else:
-                    mid_x, mid_y = points[mid_idx]
+                # Use arc-length based center for Bezier paths
+                mid_x, mid_y = compute_bezier_path_center(routed_path.control_points)
             else:
-                mid_x, mid_y = points[mid_idx]
+                # Use arc-length based center for line segment paths
+                mid_x, mid_y = compute_path_center(points)
 
             # Label background
             label_width = len(edge.label) * 7 + 12
