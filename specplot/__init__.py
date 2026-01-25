@@ -30,6 +30,9 @@ from .models import (
     OutlineItem,
     ShowAs,
 )
+from .pathfinding import (
+    PathfindingConfig,
+)
 from .renderer import (
     DEFAULT_THEME,
     DiagramRenderer,
@@ -55,6 +58,8 @@ __all__ = [
     "OutlineItem",
     "EdgeStyle",
     "ShowAs",
+    # Pathfinding
+    "PathfindingConfig",
     # Rendering
     "render_to_svg",
     "DiagramRenderer",

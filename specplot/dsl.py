@@ -6,6 +6,7 @@ from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any, Literal
 
 from .models import Diagram, Edge, EdgeStyle, Node, OutlineItem, ShowAs
+from .pathfinding import PathfindingConfig
 from .renderer import render_to_svg
 
 if TYPE_CHECKING:
@@ -43,6 +44,8 @@ def diagram(
     filename: str = "diagram",
     title: str | None = None,
     layout: tuple[tuple[str, ...], ...] | None = None,
+    pathfinding: bool | PathfindingConfig = False,
+    path_style: Literal["smooth", "orthogonal"] = "smooth",
     **kwargs: Any,
 ) -> Generator[Diagram]:
     """Create a diagram context.
@@ -59,16 +62,42 @@ def diagram(
             node(icon="api", label="API", pos=2)
             node(icon="database", label="DB", pos=3)
 
+        # With pathfinding enabled:
+        with diagram(filename="smart", pathfinding=True):
+            a = node(icon="web", label="A")
+            b = node(icon="database", label="B")
+            a >> b
+
+        # With custom pathfinding config:
+        config = PathfindingConfig(grid_spacing=20, path_style="orthogonal")
+        with diagram(filename="custom", pathfinding=config):
+            ...
+
     Args:
         filename: Output filename (without extension)
         title: Optional diagram title
         layout: Zone layout as tuple of tuples, e.g., (("LR",), ("TB", "TB"), ("LR",))
+        pathfinding: Enable intelligent edge routing (True, False, or PathfindingConfig)
+        path_style: Path style when pathfinding=True ("smooth" or "orthogonal")
         **kwargs: Additional diagram options
 
     Yields:
         The Diagram object
     """
-    d = Diagram(filename=filename, title=title, layout=layout, **kwargs)
+    # Handle pathfinding configuration
+    pathfinding_config = None
+    if pathfinding is True:
+        pathfinding_config = PathfindingConfig(enabled=True, path_style=path_style)
+    elif isinstance(pathfinding, PathfindingConfig):
+        pathfinding_config = pathfinding
+
+    d = Diagram(
+        filename=filename,
+        title=title,
+        layout=layout,
+        pathfinding_config=pathfinding_config,
+        **kwargs,
+    )
     _diagram_stack.append(d)
 
     try:

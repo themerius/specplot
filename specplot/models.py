@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+    from .pathfinding import PathfindingConfig
 
 
 class ShowAs(Enum):
@@ -130,6 +132,9 @@ class Diagram:
     padding: float = 40
     node_spacing: float = 60
     background_color: str = "#ffffff"
+
+    # Pathfinding configuration (None = disabled, use traditional routing)
+    pathfinding_config: PathfindingConfig | None = None
 
     # Theme colors
     node_fill: str = "#f8fafc"

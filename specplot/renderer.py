@@ -14,6 +14,14 @@ from .layout import (
     get_outline_item_connection_point,
     layout_diagram,
 )
+from .pathfinding import (
+    PathfindingConfig,
+    RoutedPath,
+    VirtualGrid,
+    compute_bezier_control_points,
+    extract_orthogonal_waypoints,
+    simplify_path_douglas_peucker,
+)
 
 if TYPE_CHECKING:
     from .models import Diagram, Edge, Node, OutlineItem
@@ -96,18 +104,35 @@ class EdgeRouter:
 
     This class pre-analyzes all edges in a diagram and assigns connection
     points that minimize visual collisions and crossings.
+
+    When pathfinding is enabled, uses A* grid-based routing to avoid obstacles.
     """
 
-    def __init__(self, diagram: Diagram, config: LayoutConfig):
+    def __init__(
+        self,
+        diagram: Diagram,
+        config: LayoutConfig,
+        pathfinding_config: PathfindingConfig | None = None,
+    ):
         from .models import Node, ShowAs
 
         self.diagram = diagram
         self.config = config
+        self.pathfinding_config = pathfinding_config
         self._node_connections: dict[int, dict[str, list[dict]]] = {}
         self._assigned_points: dict[int, tuple[float, float, float, float]] = {}
         # Maps edge id -> (start_x, start_y, end_x, end_y)
 
-        self._analyze_edges()
+        # Pathfinding-specific data
+        self._grid: VirtualGrid | None = None
+        self._routed_paths: dict[int, RoutedPath] = {}
+        # Maps edge id -> RoutedPath
+
+        if pathfinding_config and pathfinding_config.enabled:
+            self._grid = VirtualGrid.generate(diagram, pathfinding_config)
+            self._analyze_edges_intelligent()
+        else:
+            self._analyze_edges()
 
     def _get_effective_bounds(self, node: Node) -> tuple[float, float, float, float]:
         """Get effective bounds for a node, using parent for outline children."""
@@ -364,6 +389,125 @@ class EdgeRouter:
                     else:
                         self._assigned_points[edge_id]["target"] = (cx, cy, side, needs_detour)
 
+    def _analyze_edges_intelligent(self) -> None:
+        """Analyze edges using A* pathfinding for intelligent routing."""
+        from .models import Node, OutlineItem, ShowAs
+
+        if not self._grid:
+            return
+
+        occupied: set[tuple[int, int]] = set()
+
+        for edge in self.diagram.edges:
+            # Get source and target nodes
+            if isinstance(edge.source, Node):
+                src_node = edge.source
+                src_outline_idx = None
+            elif isinstance(edge.source, OutlineItem):
+                src_node = edge.source._parent_node
+                src_outline_idx = edge.source._index
+            else:
+                continue
+
+            if isinstance(edge.target, Node):
+                tgt_node = edge.target
+                tgt_outline_idx = None
+            elif isinstance(edge.target, OutlineItem):
+                tgt_node = edge.target._parent_node
+                tgt_outline_idx = edge.target._index
+            else:
+                continue
+
+            if src_node is None or tgt_node is None:
+                continue
+
+            # Determine best sides for connection
+            src_side = self._detect_best_side(src_node, tgt_node, is_source=True)
+            tgt_side = self._detect_best_side(src_node, tgt_node, is_source=False)
+
+            # Get snapping points
+            src_target_y = None
+            if src_outline_idx is not None and src_node._parent:
+                parent = src_node._parent
+                base_y = parent.y + self.config.header_height
+                if parent.description:
+                    base_y += self.config.description_height
+                src_target_y = base_y + src_outline_idx * self.config.outline_item_height + self.config.outline_item_height / 2
+                src_node = parent  # Use parent for snapping
+
+            tgt_target_y = None
+            if tgt_outline_idx is not None and tgt_node._parent:
+                parent = tgt_node._parent
+                base_y = parent.y + self.config.header_height
+                if parent.description:
+                    base_y += self.config.description_height
+                tgt_target_y = base_y + tgt_outline_idx * self.config.outline_item_height + self.config.outline_item_height / 2
+                tgt_node = parent  # Use parent for snapping
+
+            src_snap = self._grid.select_snapping_point(
+                src_node, src_side, occupied, target_y=src_target_y
+            )
+            tgt_snap = self._grid.select_snapping_point(
+                tgt_node, tgt_side, occupied, target_y=tgt_target_y
+            )
+
+            if not src_snap or not tgt_snap:
+                # Fall back to center-to-center
+                src_x = src_node.x + src_node.width / 2
+                src_y = src_node.y + src_node.height / 2
+                tgt_x = tgt_node.x + tgt_node.width / 2
+                tgt_y = tgt_node.y + tgt_node.height / 2
+                self._routed_paths[id(edge)] = RoutedPath(
+                    points=[(src_x, src_y), (tgt_x, tgt_y)],
+                    source_side=src_side,
+                    target_side=tgt_side,
+                )
+                continue
+
+            # Mark as occupied
+            occupied.add((src_snap.grid_row, src_snap.grid_col))
+            occupied.add((tgt_snap.grid_row, tgt_snap.grid_col))
+
+            # Find path using A*
+            start = (src_snap.grid_row, src_snap.grid_col)
+            end = (tgt_snap.grid_row, tgt_snap.grid_col)
+            path_points = self._grid.find_path(start, end)
+
+            if path_points is None:
+                # No path found - use direct line
+                path_points = [(src_snap.x, src_snap.y), (tgt_snap.x, tgt_snap.y)]
+
+            # Process path based on style
+            if self.pathfinding_config and self.pathfinding_config.path_style == "orthogonal":
+                # Orthogonal: extract waypoints
+                waypoints = extract_orthogonal_waypoints(path_points)
+                self._routed_paths[id(edge)] = RoutedPath(
+                    points=waypoints,
+                    source_side=src_side,
+                    target_side=tgt_side,
+                )
+            else:
+                # Smooth: simplify and compute Bezier control points
+                tolerance = self.pathfinding_config.simplification_tolerance if self.pathfinding_config else 5.0
+                simplified = simplify_path_douglas_peucker(path_points, tolerance)
+                control_points = compute_bezier_control_points(simplified)
+                self._routed_paths[id(edge)] = RoutedPath(
+                    points=simplified,
+                    source_side=src_side,
+                    target_side=tgt_side,
+                    control_points=control_points,
+                )
+
+            # Also store in legacy format for compatibility
+            self._assigned_points[id(edge)] = {
+                "source": (src_snap.x, src_snap.y, src_side, False),
+                "target": (tgt_snap.x, tgt_snap.y, tgt_side, False),
+            }
+
+    def get_routed_path(self, edge: Edge) -> RoutedPath | None:
+        """Get the computed path for an edge (when pathfinding is enabled)."""
+        return self._routed_paths.get(id(edge))
+
     def get_edge_points(self, edge: Edge) -> tuple[
         tuple[float, float, str, bool],
         tuple[float, float, str, bool]
@@ -437,7 +581,11 @@ class DiagramRenderer:
             self._render_node(d, node)
 
         # Create edge router for collision-free edge placement
-        edge_router = EdgeRouter(diagram, self.config)
+        edge_router = EdgeRouter(
+            diagram,
+            self.config,
+            pathfinding_config=diagram.pathfinding_config,
+        )
 
         # Render edges on top (so arrowheads are visible)
         for edge in diagram.edges:
@@ -657,14 +805,6 @@ class DiagramRenderer:
         """Render an edge using pre-computed connection points from EdgeRouter."""
         from .models import EdgeStyle, Node, OutlineItem, ShowAs
 
-        # Get pre-computed connection points from router
-        points = edge_router.get_edge_points(edge)
-        if points is None:
-            return
-
-        (sx, sy, src_side, src_detour), (tx, ty, tgt_side, tgt_detour) = points
-        needs_detour = src_detour or tgt_detour
-
         # Style settings
         is_dotted = edge.style in (
             EdgeStyle.DOTTED,
@@ -679,6 +819,22 @@ class DiagramRenderer:
             EdgeStyle.ARROW_LEFT,
             EdgeStyle.DOTTED_ARROW_LEFT,
         )
+
+        # Check for pathfinding-based route first
+        routed_path = edge_router.get_routed_path(edge)
+        if routed_path:
+            self._render_routed_edge(
+                d, edge, routed_path, is_dotted, has_arrow_start, has_arrow_end
+            )
+            return
+
+        # Fall back to traditional routing
+        points = edge_router.get_edge_points(edge)
+        if points is None:
+            return
+
+        (sx, sy, src_side, src_detour), (tx, ty, tgt_side, tgt_detour) = points
+        needs_detour = src_detour or tgt_detour
 
         path = draw.Path(
             stroke=self.theme.edge_color,
@@ -762,6 +918,130 @@ class DiagramRenderer:
             # Bezier formula: B(t) = (1-t)^3*P0 + 3*(1-t)^2*t*P1 + 3*(1-t)*t^2*P2 + t^3*P3
             mid_x = (1-t)**3 * sx + 3*(1-t)**2*t * c1x + 3*(1-t)*t**2 * c2x + t**3 * tx
             mid_y = (1-t)**3 * sy + 3*(1-t)**2*t * c1y + 3*(1-t)*t**2 * c2y + t**3 * ty
+
+            # Label background
+            label_width = len(edge.label) * 7 + 12
+            d.append(
+                draw.Rectangle(
+                    mid_x - label_width / 2,
+                    mid_y - 9,
+                    label_width,
+                    18,
+                    fill=self.theme.background,
+                    stroke=self.theme.edge_color,
+                    stroke_width=1,
+                    rx=4, ry=4,
+                )
+            )
+
+            d.append(
+                draw.Text(
+                    edge.label,
+                    11,
+                    mid_x, mid_y,
+                    fill=self.theme.text_secondary,
+                    font_family="JetBrains Mono, Consolas, monospace",
+                    text_anchor="middle",
+                    dominant_baseline="middle",
+                )
+            )
+
+    def _render_routed_edge(
+        self,
+        d: draw.Drawing,
+        edge: Edge,
+        routed_path: RoutedPath,
+        is_dotted: bool,
+        has_arrow_start: bool,
+        has_arrow_end: bool,
+    ) -> None:
+        """Render an edge using pathfinding-based routing."""
+        points = routed_path.points
+        if len(points) < 2:
+            return
+
+        path = draw.Path(
+            stroke=self.theme.edge_color,
+            stroke_width=1.5,
+            fill="none",
+        )
+
+        if is_dotted:
+            path = draw.Path(
+                stroke=self.theme.edge_color,
+                stroke_width=1.5,
+                fill="none",
+                stroke_dasharray="5,5",
+            )
+
+        sx, sy = points[0]
+        tx, ty = points[-1]
+
+        if routed_path.control_points and len(routed_path.control_points) >= 4:
+            # Use Bezier curves for smooth paths
+            cps = routed_path.control_points
+            path.M(cps[0][0], cps[0][1])
+
+            # Each segment needs: control1, control2, endpoint
+            i = 1
+            while i + 2 < len(cps):
+                c1x, c1y = cps[i]
+                c2x, c2y = cps[i + 1]
+                ex, ey = cps[i + 2]
+                path.C(c1x, c1y, c2x, c2y, ex, ey)
+                i += 3
+
+            # Store last control point for arrowhead angle
+            last_control_x, last_control_y = cps[-2] if len(cps) >= 2 else (sx, sy)
+            first_control_x, first_control_y = cps[1] if len(cps) >= 2 else (tx, ty)
+        else:
+            # Use line segments for orthogonal paths
+            path.M(sx, sy)
+            for px, py in points[1:]:
+                path.L(px, py)
+
+            # Control points for arrowhead angles
+            if len(points) >= 2:
+                last_control_x, last_control_y = points[-2]
+                first_control_x, first_control_y = points[1]
+            else:
+                last_control_x, last_control_y = sx, sy
+                first_control_x, first_control_y = tx, ty
+
+        d.append(path)
+
+        # Draw arrowheads
+        arrow_size = 8
+
+        if has_arrow_end:
+            angle = math.atan2(ty - last_control_y, tx - last_control_x)
+            self._draw_arrowhead(d, tx, ty, angle, arrow_size)
+
+        if has_arrow_start:
+            angle = math.atan2(sy - first_control_y, sx - first_control_x)
+            self._draw_arrowhead(d, sx, sy, angle, arrow_size)
+
+        # Draw label if present (positioned at path midpoint)
+        if edge.label:
+            # Find approximate midpoint of the path
+            mid_idx = len(points) // 2
+            if routed_path.control_points and len(routed_path.control_points) >= 4:
+                # Use Bezier midpoint for smooth paths
+                cps = routed_path.control_points
+                # Find the middle segment
+                mid_seg = len(cps) // 4
+                if mid_seg * 3 + 2 < len(cps):
+                    p0 = cps[mid_seg * 3]
+                    c1 = cps[mid_seg * 3 + 1]
+                    c2 = cps[mid_seg * 3 + 2]
+                    p3 = cps[min(mid_seg * 3 + 3, len(cps) - 1)]
+                    t = 0.5
+                    mid_x = (1-t)**3 * p0[0] + 3*(1-t)**2*t * c1[0] + 3*(1-t)*t**2 * c2[0] + t**3 * p3[0]
+                    mid_y = (1-t)**3 * p0[1] + 3*(1-t)**2*t * c1[1] + 3*(1-t)*t**2 * c2[1] + t**3 * p3[1]
+                else:
+                    mid_x, mid_y = points[mid_idx]
+            else:
+                mid_x, mid_y = points[mid_idx]
 
             # Label background
             label_width = len(edge.label) * 7 + 12
