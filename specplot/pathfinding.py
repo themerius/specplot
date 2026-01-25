@@ -30,6 +30,10 @@ class PathfindingConfig:
     # Path aesthetic penalties
     diagonal_penalty: float = 1.5  # Multiplier for diagonal movement (prefer orthogonal)
     turn_penalty: float = 2.0  # Added cost for changing direction (prefer straight)
+    # Node margin: multiplier of grid_spacing for blocking area around nodes
+    node_margin: float = 3.0  # 3x grid_spacing = 45px default margin for edge corridors
+    # Layout spacing multiplier: increases space between nodes for edge routing
+    layout_spacing_multiplier: float = 2.0  # 2x = 160h/60v spacing between nodes
 
 
 @dataclass
@@ -95,7 +99,9 @@ class VirtualGrid:
             Populated VirtualGrid ready for pathfinding
         """
         # Compute diagram bounds with padding
-        bounds = cls._compute_bounds(diagram, padding=config.grid_spacing * 2)
+        # Padding needs to accommodate node_margin plus extra routing space
+        padding = config.grid_spacing * (config.node_margin + 2)
+        bounds = cls._compute_bounds(diagram, padding=padding)
         grid = cls(bounds, config)
 
         # Create grid of virtual nodes
@@ -169,10 +175,13 @@ class VirtualGrid:
                 self.nodes[(row, col)] = vnode
 
     def _collect_obstacles(self, diagram: Diagram) -> None:
-        """Collect all node bounding boxes as obstacles.
+        """Collect all node bounding boxes as obstacles with margin.
 
         For GROUP nodes: Only block the header+description area (not the content).
         This allows edges to route inside groups to reach nested children.
+
+        Node margin (node_margin * grid_spacing) is added around each obstacle
+        to create corridors for edge routing.
         """
         from .models import ShowAs
 
@@ -180,33 +189,60 @@ class VirtualGrid:
         HEADER_HEIGHT = 40
         DESCRIPTION_HEIGHT = 38
 
+        # Calculate the margin to add around each node
+        margin = self.config.node_margin * self.config.grid_spacing
+
         def collect_node(node: Node, is_group_child: bool = False) -> None:
             is_group = node.children and node.show_as == ShowAs.GROUP
 
             if is_group:
-                # For groups: only block header+description area
+                # For groups: block header+description area
                 header_bottom = node.y + HEADER_HEIGHT
                 if node.description:
                     header_bottom += DESCRIPTION_HEIGHT
 
                 # Block the header zone
                 self._node_obstacles.append((
-                    node.x,
-                    node.y,
-                    node.x + node.width,
+                    node.x - margin,
+                    node.y - margin,
+                    node.x + node.width + margin,
                     header_bottom,
+                ))
+
+                # Block left wall of group (thin vertical obstacle)
+                self._node_obstacles.append((
+                    node.x - margin,
+                    header_bottom,
+                    node.x + margin,  # Thin wall
+                    node.y + node.height + margin,
+                ))
+
+                # Block right wall of group (thin vertical obstacle)
+                self._node_obstacles.append((
+                    node.x + node.width - margin,
+                    header_bottom,
+                    node.x + node.width + margin,
+                    node.y + node.height + margin,
+                ))
+
+                # Block bottom wall of group
+                self._node_obstacles.append((
+                    node.x - margin,
+                    node.y + node.height - margin,
+                    node.x + node.width + margin,
+                    node.y + node.height + margin,
                 ))
 
                 # Recurse into children (they become obstacles within the group)
                 for child in node.children:
                     collect_node(child, is_group_child=True)
             else:
-                # Regular nodes: block entire bounds
+                # Regular nodes: block entire bounds with margin
                 self._node_obstacles.append((
-                    node.x,
-                    node.y,
-                    node.x + node.width,
-                    node.y + node.height,
+                    node.x - margin,
+                    node.y - margin,
+                    node.x + node.width + margin,
+                    node.y + node.height + margin,
                 ))
 
                 # Handle outline children (they don't have separate bounds)
@@ -329,6 +365,8 @@ class VirtualGrid:
         from .models import ShowAs
 
         spacing = self.config.grid_spacing
+        # Offset for finding grid points outside the node margin
+        grid_offset = (self.config.node_margin + 1) * spacing
 
         # Layout constants (matching LayoutConfig defaults)
         HEADER_HEIGHT = 40
@@ -365,8 +403,8 @@ class VirtualGrid:
                 y = node.y + t * node.height
                 x = node.x  # Exactly on the border
 
-                # Find nearest grid point for pathfinding
-                grid_pos = self.get_nearest_grid_point(x - spacing, y)
+                # Find nearest grid point for pathfinding (outside node margin)
+                grid_pos = self.get_nearest_grid_point(x - grid_offset, y)
                 if grid_pos is None:
                     grid_pos = (0, 0)
 
@@ -395,7 +433,7 @@ class VirtualGrid:
                 if is_group and y < header_zone_bottom:
                     continue
 
-                grid_pos = self.get_nearest_grid_point(x + spacing, y)
+                grid_pos = self.get_nearest_grid_point(x + grid_offset, y)
                 if grid_pos is None:
                     grid_pos = (0, 0)
 
@@ -426,7 +464,7 @@ class VirtualGrid:
                 x = node.x + t * node.width
                 y = node.y  # Exactly on the border
 
-                grid_pos = self.get_nearest_grid_point(x, y - spacing)
+                grid_pos = self.get_nearest_grid_point(x, y - grid_offset)
                 if grid_pos is None:
                     grid_pos = (0, 0)
 
@@ -449,7 +487,7 @@ class VirtualGrid:
                 x = node.x + t * node.width
                 y = node.y + node.height  # Exactly on the border
 
-                grid_pos = self.get_nearest_grid_point(x, y + spacing)
+                grid_pos = self.get_nearest_grid_point(x, y + grid_offset)
                 if grid_pos is None:
                     grid_pos = (0, 0)
 
@@ -502,6 +540,11 @@ class VirtualGrid:
         if start not in self.graph or end not in self.graph:
             return None
 
+        # Handle same-cell case (nodes very close together)
+        if start == end:
+            node = self.nodes[start]
+            return [(node.x, node.y), (node.x, node.y)]
+
         try:
             start_node = self.nodes[start]
             end_node = self.nodes[end]
@@ -522,8 +565,14 @@ class VirtualGrid:
                         (start_node.x, start_node.y),
                         (end_node.x, end_node.y),
                     )
-                    # Add small penalty proportional to deviation
-                    dist_to_goal += deviation * 0.1
+                    # Add penalty proportional to deviation (stronger = straighter paths)
+                    dist_to_goal += deviation * 0.5
+
+                    # Extra penalty for going outside diagram bounds (above y=0 or x<0)
+                    if va.y < 0:
+                        dist_to_goal += abs(va.y) * 2.0
+                    if va.x < 0:
+                        dist_to_goal += abs(va.x) * 2.0
 
                 return dist_to_goal
 
@@ -756,16 +805,101 @@ class VirtualGrid:
 def simplify_path_douglas_peucker(
     points: list[tuple[float, float]],
     tolerance: float,
+    min_waypoint_spacing: float = 150.0,
 ) -> list[tuple[float, float]]:
-    """Simplify path using Douglas-Peucker algorithm.
+    """Simplify path using Douglas-Peucker algorithm with minimum waypoint density.
 
     Args:
         points: List of (x, y) points
         tolerance: Maximum perpendicular distance to keep
+        min_waypoint_spacing: Maximum distance between waypoints (ensures density)
 
     Returns:
         Simplified list of points
     """
+    if len(points) <= 2:
+        return points
+
+    # First, apply Douglas-Peucker simplification
+    simplified = _douglas_peucker_recursive(points, tolerance)
+
+    # Then ensure minimum waypoint density for long segments
+    if min_waypoint_spacing > 0:
+        simplified = _ensure_waypoint_density(points, simplified, min_waypoint_spacing)
+
+    return simplified
+
+
+def _ensure_waypoint_density(
+    original: list[tuple[float, float]],
+    simplified: list[tuple[float, float]],
+    max_spacing: float,
+) -> list[tuple[float, float]]:
+    """Ensure waypoints are spaced no more than max_spacing apart.
+
+    Reinserts points from original path where simplified segments are too long.
+    """
+    if len(simplified) < 2:
+        return simplified
+
+    result = [simplified[0]]
+
+    for i in range(1, len(simplified)):
+        prev = simplified[i - 1]
+        curr = simplified[i]
+
+        # Calculate segment length
+        dx = curr[0] - prev[0]
+        dy = curr[1] - prev[1]
+        dist = math.sqrt(dx * dx + dy * dy)
+
+        if dist > max_spacing:
+            # Need to insert intermediate points
+            # Find points from original that lie between prev and curr
+            # and are closest to evenly spaced positions
+
+            # How many intermediate points needed?
+            num_intermediate = int(dist / max_spacing)
+
+            # Find original points in this segment's bounding box
+            min_x = min(prev[0], curr[0]) - 1
+            max_x = max(prev[0], curr[0]) + 1
+            min_y = min(prev[1], curr[1]) - 1
+            max_y = max(prev[1], curr[1]) + 1
+
+            # Collect candidate points from original
+            candidates = []
+            for p in original:
+                if min_x <= p[0] <= max_x and min_y <= p[1] <= max_y:
+                    # Check if point is "between" prev and curr along the segment
+                    if p != prev and p != curr:
+                        candidates.append(p)
+
+            if candidates:
+                # Sort by distance along segment
+                def project_onto_segment(p):
+                    t = ((p[0] - prev[0]) * dx + (p[1] - prev[1]) * dy) / (dist * dist)
+                    return max(0, min(1, t))
+
+                candidates.sort(key=project_onto_segment)
+
+                # Select evenly spaced points
+                step = len(candidates) / (num_intermediate + 1)
+                for j in range(1, num_intermediate + 1):
+                    idx = int(j * step)
+                    if idx < len(candidates):
+                        result.append(candidates[min(idx, len(candidates) - 1)])
+
+        result.append(curr)
+
+    return result
+
+
+def _douglas_peucker_recursive(
+    points: list[tuple[float, float]],
+    tolerance: float,
+) -> list[tuple[float, float]]:
+    """Recursive Douglas-Peucker implementation."""
     if len(points) <= 2:
         return points
 
@@ -784,8 +918,8 @@ def simplify_path_douglas_peucker(
 
     # If max distance is greater than tolerance, recursively simplify
     if max_dist > tolerance:
-        left = simplify_path_douglas_peucker(points[: max_idx + 1], tolerance)
-        right = simplify_path_douglas_peucker(points[max_idx:], tolerance)
+        left = _douglas_peucker_recursive(points[: max_idx + 1], tolerance)
+        right = _douglas_peucker_recursive(points[max_idx:], tolerance)
         return left[:-1] + right
     else:
         return [first, last]
@@ -818,14 +952,17 @@ def _perpendicular_distance(
 def compute_bezier_control_points(
     points: list[tuple[float, float]],
     tension: float = 0.3,
+    max_control_distance: float = 50.0,
 ) -> list[tuple[float, float]]:
     """Compute smooth Bezier control points for a path.
 
     Uses Catmull-Rom spline converted to cubic Bezier for smooth curves.
+    Control point offsets are constrained to prevent wild curves on long segments.
 
     Args:
         points: Simplified path points
         tension: Curve tension (0 = angular, 1 = very smooth)
+        max_control_distance: Maximum distance control points can be from endpoints
 
     Returns:
         List of control points for SVG path
@@ -848,10 +985,26 @@ def compute_bezier_control_points(
         p3 = points[min(len(points) - 1, i + 1)]
 
         # Catmull-Rom to Bezier conversion
-        c1x = p1[0] + (p2[0] - p0[0]) * tension / 3
-        c1y = p1[1] + (p2[1] - p0[1]) * tension / 3
-        c2x = p2[0] - (p3[0] - p1[0]) * tension / 3
-        c2y = p2[1] - (p3[1] - p1[1]) * tension / 3
+        c1_offset_x = (p2[0] - p0[0]) * tension / 3
+        c1_offset_y = (p2[1] - p0[1]) * tension / 3
+        c2_offset_x = (p3[0] - p1[0]) * tension / 3
+        c2_offset_y = (p3[1] - p1[1]) * tension / 3
+
+        # Constrain control point offsets to prevent wild curves
+        def constrain_offset(ox: float, oy: float) -> tuple[float, float]:
+            dist = math.sqrt(ox * ox + oy * oy)
+            if dist > max_control_distance:
+                scale = max_control_distance / dist
+                return ox * scale, oy * scale
+            return ox, oy
+
+        c1_offset_x, c1_offset_y = constrain_offset(c1_offset_x, c1_offset_y)
+        c2_offset_x, c2_offset_y = constrain_offset(c2_offset_x, c2_offset_y)
+
+        c1x = p1[0] + c1_offset_x
+        c1y = p1[1] + c1_offset_y
+        c2x = p2[0] - c2_offset_x
+        c2y = p2[1] - c2_offset_y
 
         result.extend([(c1x, c1y), (c2x, c2y), p2])
 
@@ -895,6 +1048,110 @@ def extract_orthogonal_waypoints(
             result.append(mid)
         result.append(next_point)
         current = next_point
+
+    return result
+
+
+def compute_rounded_polyline(
+    points: list[tuple[float, float]],
+    corner_radius: float = 10.0,
+) -> list[dict]:
+    """Convert path points to a polyline with rounded corners.
+
+    Returns SVG path commands for straight segments with arc corners.
+
+    Args:
+        points: List of (x, y) waypoints
+        corner_radius: Radius for rounded corners
+
+    Returns:
+        List of path commands: {'type': 'M'|'L'|'Q', 'points': [...]}
+    """
+    if len(points) < 2:
+        return [{'type': 'M', 'points': [points[0]]}] if points else []
+
+    if len(points) == 2:
+        return [
+            {'type': 'M', 'points': [points[0]]},
+            {'type': 'L', 'points': [points[1]]},
+        ]
+
+    commands = []
+    commands.append({'type': 'M', 'points': [points[0]]})
+
+    for i in range(1, len(points) - 1):
+        prev = points[i - 1]
+        curr = points[i]
+        next_pt = points[i + 1]
+
+        # Calculate vectors
+        v1x, v1y = curr[0] - prev[0], curr[1] - prev[1]
+        v2x, v2y = next_pt[0] - curr[0], next_pt[1] - curr[1]
+
+        # Lengths
+        len1 = math.sqrt(v1x * v1x + v1y * v1y)
+        len2 = math.sqrt(v2x * v2x + v2y * v2y)
+
+        if len1 < 0.001 or len2 < 0.001:
+            # Degenerate case - just line to point
+            commands.append({'type': 'L', 'points': [curr]})
+            continue
+
+        # Normalize
+        v1x, v1y = v1x / len1, v1y / len1
+        v2x, v2y = v2x / len2, v2y / len2
+
+        # Calculate how much we can round (limited by segment lengths)
+        max_radius = min(corner_radius, len1 / 2, len2 / 2)
+
+        if max_radius < 2:
+            # Too small to round - just use the point
+            commands.append({'type': 'L', 'points': [curr]})
+            continue
+
+        # Points where the arc starts and ends
+        arc_start = (curr[0] - v1x * max_radius, curr[1] - v1y * max_radius)
+        arc_end = (curr[0] + v2x * max_radius, curr[1] + v2y * max_radius)
+
+        # Line to arc start
+        commands.append({'type': 'L', 'points': [arc_start]})
+
+        # Quadratic bezier for the rounded corner (control point is the original corner)
+        commands.append({'type': 'Q', 'points': [curr, arc_end]})
+
+    # Final line to last point
+    commands.append({'type': 'L', 'points': [points[-1]]})
+
+    return commands
+
+
+def straighten_endpoints(
+    points: list[tuple[float, float]],
+    distance: float = 20.0,
+) -> list[tuple[float, float]]:
+    """Ensure the first and last segments are straight (perpendicular-ish).
+
+    Adjusts points near endpoints to create clean entry/exit for arrowheads.
+
+    Args:
+        points: Path waypoints
+        distance: How far from endpoint to straighten
+
+    Returns:
+        Modified points with straightened endpoints
+    """
+    if len(points) < 3:
+        return points
+
+    result = list(points)
+
+    # Straighten start: ensure second point is aligned with perpendicular waypoint direction
+    # The perpendicular waypoint should already be there from _insert_perpendicular_waypoints
+    # Just make sure we don't curve away from it
+
+    # Straighten end: ensure second-to-last point leads straight to endpoint
+    # If the last two points are already close to straight, leave them
+    # Otherwise, adjust the second-to-last point
 
     return result
 

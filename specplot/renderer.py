@@ -659,7 +659,7 @@ class EdgeRouter:
 
             # Process path based on style
             if self.pathfinding_config and self.pathfinding_config.path_style == "orthogonal":
-                # Orthogonal: extract waypoints
+                # Orthogonal: extract waypoints for strict H/V segments
                 waypoints = extract_orthogonal_waypoints(path_points)
                 self._routed_paths[id(edge)] = RoutedPath(
                     points=waypoints,
@@ -667,15 +667,15 @@ class EdgeRouter:
                     target_side=tgt_side,
                 )
             else:
-                # Smooth: simplify and compute Bezier control points
+                # Smooth: simplify path, will render as polyline with rounded corners
                 tolerance = self.pathfinding_config.simplification_tolerance if self.pathfinding_config else 5.0
                 simplified = simplify_path_douglas_peucker(path_points, tolerance)
-                control_points = compute_bezier_control_points(simplified)
+                # Store simplified points - rounded corners computed during rendering
                 self._routed_paths[id(edge)] = RoutedPath(
                     points=simplified,
                     source_side=src_side,
                     target_side=tgt_side,
-                    control_points=control_points,
+                    control_points=None,  # No longer using Bezier control points
                 )
 
             # Also store in legacy format for compatibility
@@ -781,8 +781,34 @@ class DiagramRenderer:
 
     def render(self, diagram: Diagram) -> draw.Drawing:
         """Render a diagram to an SVG Drawing object."""
+        # Apply pathfinding spacing multiplier if enabled
+        config = self.config
+        if diagram.pathfinding_config and diagram.pathfinding_config.enabled:
+            multiplier = diagram.pathfinding_config.layout_spacing_multiplier
+            if multiplier != 1.0:
+                # Create a new config with adjusted spacing
+                config = LayoutConfig(
+                    node_width=self.config.node_width,
+                    node_padding=self.config.node_padding,
+                    header_height=self.config.header_height,
+                    description_height=self.config.description_height,
+                    outline_item_height=self.config.outline_item_height,
+                    group_padding=self.config.group_padding,
+                    group_header_height=self.config.group_header_height,
+                    node_spacing_h=self.config.node_spacing_h * multiplier,
+                    node_spacing_v=self.config.node_spacing_v * multiplier,
+                    icon_size=self.config.icon_size,
+                    font_size_label=self.config.font_size_label,
+                    font_size_description=self.config.font_size_description,
+                    font_size_outline=self.config.font_size_outline,
+                    char_width_avg=self.config.char_width_avg,
+                    max_label_chars=self.config.max_label_chars,
+                    max_description_chars=self.config.max_description_chars,
+                    max_outline_chars=self.config.max_outline_chars,
+                )
+
         # Layout the diagram
-        layout_diagram(diagram, self.config)
+        layout_diagram(diagram, config)
 
         # Calculate canvas size (including nested nodes)
         def get_bounds(node: Node) -> tuple[float, float]:
@@ -830,6 +856,9 @@ class DiagramRenderer:
         # Render debug visualization if enabled
         if diagram.pathfinding_config and diagram.pathfinding_config.debug:
             self._render_debug_grid(d, edge_router)
+
+        # Store pathfinding config for edge rendering
+        self._current_pathfinding_config = diagram.pathfinding_config
 
         # Render edges on top (so arrowheads are visible)
         for edge in diagram.edges:
@@ -1275,6 +1304,8 @@ class DiagramRenderer:
         has_arrow_end: bool,
     ) -> None:
         """Render an edge using pathfinding-based routing."""
+        from .pathfinding import compute_rounded_polyline
+
         points = routed_path.points
         if len(points) < 2:
             return
@@ -1296,47 +1327,55 @@ class DiagramRenderer:
         sx, sy = points[0]
         tx, ty = points[-1]
 
-        if routed_path.control_points and len(routed_path.control_points) >= 4:
-            # Use Bezier curves for smooth paths
-            cps = routed_path.control_points
-            path.M(cps[0][0], cps[0][1])
+        # Render as polyline with rounded corners (default) or orthogonal
+        # Get pathfinding config from the edge router or diagram
+        pathfinding_config = getattr(self, '_current_pathfinding_config', None)
+        is_orthogonal = (
+            pathfinding_config
+            and pathfinding_config.path_style == "orthogonal"
+        )
 
-            # Each segment needs: control1, control2, endpoint
-            i = 1
-            while i + 2 < len(cps):
-                c1x, c1y = cps[i]
-                c2x, c2y = cps[i + 1]
-                ex, ey = cps[i + 2]
-                path.C(c1x, c1y, c2x, c2y, ex, ey)
-                i += 3
-
-            # Store last control point for arrowhead angle
-            last_control_x, last_control_y = cps[-2] if len(cps) >= 2 else (sx, sy)
-            first_control_x, first_control_y = cps[1] if len(cps) >= 2 else (tx, ty)
-        else:
-            # Use line segments for orthogonal paths
+        if is_orthogonal:
+            # Pure line segments for orthogonal style
             path.M(sx, sy)
             for px, py in points[1:]:
                 path.L(px, py)
+        else:
+            # Polyline with rounded corners
+            commands = compute_rounded_polyline(points, corner_radius=12.0)
+            for cmd in commands:
+                if cmd['type'] == 'M':
+                    px, py = cmd['points'][0]
+                    path.M(px, py)
+                elif cmd['type'] == 'L':
+                    px, py = cmd['points'][0]
+                    path.L(px, py)
+                elif cmd['type'] == 'Q':
+                    ctrl = cmd['points'][0]
+                    end = cmd['points'][1]
+                    path.Q(ctrl[0], ctrl[1], end[0], end[1])
 
-            # Control points for arrowhead angles
-            if len(points) >= 2:
-                last_control_x, last_control_y = points[-2]
-                first_control_x, first_control_y = points[1]
-            else:
-                last_control_x, last_control_y = sx, sy
-                first_control_x, first_control_y = tx, ty
+        # For arrowhead angles, use the direction of the last/first segment
+        # This ensures arrowheads point in the direction of travel
+        if len(points) >= 2:
+            last_control_x, last_control_y = points[-2]
+            first_control_x, first_control_y = points[1]
+        else:
+            last_control_x, last_control_y = sx, sy
+            first_control_x, first_control_y = tx, ty
 
         d.append(path)
 
-        # Draw arrowheads
+        # Draw arrowheads following the edge's direction
         arrow_size = 8
 
         if has_arrow_end:
+            # Use direction from last control point to target
             angle = math.atan2(ty - last_control_y, tx - last_control_x)
             self._draw_arrowhead(d, tx, ty, angle, arrow_size)
 
         if has_arrow_start:
+            # Use direction from first control point to source (reversed)
             angle = math.atan2(sy - first_control_y, sx - first_control_x)
             self._draw_arrowhead(d, sx, sy, angle, arrow_size)
 
