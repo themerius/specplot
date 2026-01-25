@@ -192,6 +192,81 @@ class EdgeRouter:
                 else:
                     return "top" if dy > 0 else "bottom"
 
+    def _find_best_side_combination(
+        self,
+        src_node: Node,
+        tgt_node: Node,
+        src_target_y: float | None = None,
+        tgt_target_y: float | None = None,
+    ) -> tuple[str, str]:
+        """Find the best side combination by trying all options and comparing path costs.
+
+        Includes angle penalty for shallow exit/entry angles (< 45 degrees).
+
+        Args:
+            src_node: Source node
+            tgt_node: Target node
+            src_target_y: Optional y coordinate for outline item source
+            tgt_target_y: Optional y coordinate for outline item target
+
+        Returns:
+            (src_side, tgt_side) tuple with lowest path cost
+        """
+        from .models import Node
+
+        if not self._grid:
+            # Fall back to geometric heuristics
+            src_side = self._detect_best_side(src_node, tgt_node, is_source=True)
+            tgt_side = self._detect_best_side(src_node, tgt_node, is_source=False)
+            return src_side, tgt_side
+
+        sides = ["left", "right", "top", "bottom"]
+        best_cost = float("inf")
+        best_combination = ("right", "left")  # Default fallback
+
+        # Get geometric suggestion as a baseline (for tie-breaking)
+        geo_src = self._detect_best_side(src_node, tgt_node, is_source=True)
+        geo_tgt = self._detect_best_side(src_node, tgt_node, is_source=False)
+
+        for src_side in sides:
+            # Get snapping point for source
+            src_snap = self._grid.select_snapping_point(
+                src_node, src_side, set(), target_y=src_target_y
+            )
+            if not src_snap:
+                continue
+
+            for tgt_side in sides:
+                # Get snapping point for target
+                tgt_snap = self._grid.select_snapping_point(
+                    tgt_node, tgt_side, set(), target_y=tgt_target_y
+                )
+                if not tgt_snap:
+                    continue
+
+                # Find path cost for this combination
+                start = (src_snap.grid_row, src_snap.grid_col)
+                end = (tgt_snap.grid_row, tgt_snap.grid_col)
+
+                path = self._grid.find_path(start, end)
+                if path is None:
+                    continue
+
+                # Calculate path cost (number of segments as proxy)
+                cost = len(path)
+
+                # Slight preference for geometric suggestion (tie-breaker)
+                if src_side != geo_src:
+                    cost += 0.1
+                if tgt_side != geo_tgt:
+                    cost += 0.1
+
+                if cost < best_cost:
+                    best_cost = cost
+                    best_combination = (src_side, tgt_side)
+
+        return best_combination
+
     def _analyze_edges(self) -> None:
         """Analyze all edges and group by node and side."""
         from .models import Node, OutlineItem
@@ -451,9 +526,10 @@ class EdgeRouter:
                 tgt_target_y = base_y + tgt_outline_idx * self.config.outline_item_height + self.config.outline_item_height / 2
                 tgt_snap_node = parent
 
-            # Determine best sides for connection
-            src_side = self._detect_best_side(src_snap_node, tgt_snap_node, is_source=True)
-            tgt_side = self._detect_best_side(src_snap_node, tgt_snap_node, is_source=False)
+            # Determine best sides using path cost preview
+            src_side, tgt_side = self._find_best_side_combination(
+                src_snap_node, tgt_snap_node, src_target_y, tgt_target_y
+            )
 
             # Get source center for sorting
             src_cx = src_snap_node.x + src_snap_node.width / 2
@@ -575,6 +651,12 @@ class EdgeRouter:
                 path_points[0] = (src_snap.x, src_snap.y)
                 path_points[-1] = (tgt_snap.x, tgt_snap.y)
 
+            # Insert perpendicular waypoints to ensure clean exit/entry angles
+            PERPENDICULAR_OFFSET = 25.0  # Distance to first waypoint
+            path_points = self._insert_perpendicular_waypoints(
+                path_points, src_side, tgt_side, PERPENDICULAR_OFFSET
+            )
+
             # Process path based on style
             if self.pathfinding_config and self.pathfinding_config.path_style == "orthogonal":
                 # Orthogonal: extract waypoints
@@ -601,6 +683,66 @@ class EdgeRouter:
                 "source": (src_snap.x, src_snap.y, src_side, False),
                 "target": (tgt_snap.x, tgt_snap.y, tgt_side, False),
             }
+
+    def _insert_perpendicular_waypoints(
+        self,
+        path_points: list[tuple[float, float]],
+        src_side: str,
+        tgt_side: str,
+        offset: float,
+    ) -> list[tuple[float, float]]:
+        """Insert perpendicular waypoints to ensure clean exit/entry angles.
+
+        Adds a waypoint perpendicular to the border near the start and end
+        of the path, forcing edges to exit/enter at ~90 degree angles.
+
+        Args:
+            path_points: Original path points
+            src_side: Source node side ("left", "right", "top", "bottom")
+            tgt_side: Target node side
+            offset: Distance for perpendicular waypoint from border
+
+        Returns:
+            Modified path with perpendicular waypoints inserted
+        """
+        if len(path_points) < 2:
+            return path_points
+
+        result = []
+
+        # Add source point
+        src_x, src_y = path_points[0]
+        result.append((src_x, src_y))
+
+        # Add perpendicular waypoint after source
+        if src_side == "left":
+            result.append((src_x - offset, src_y))
+        elif src_side == "right":
+            result.append((src_x + offset, src_y))
+        elif src_side == "top":
+            result.append((src_x, src_y - offset))
+        elif src_side == "bottom":
+            result.append((src_x, src_y + offset))
+
+        # Add middle points (skip first and last)
+        for point in path_points[1:-1]:
+            result.append(point)
+
+        # Add perpendicular waypoint before target
+        tgt_x, tgt_y = path_points[-1]
+        if tgt_side == "left":
+            result.append((tgt_x - offset, tgt_y))
+        elif tgt_side == "right":
+            result.append((tgt_x + offset, tgt_y))
+        elif tgt_side == "top":
+            result.append((tgt_x, tgt_y - offset))
+        elif tgt_side == "bottom":
+            result.append((tgt_x, tgt_y + offset))
+
+        # Add target point
+        result.append((tgt_x, tgt_y))
+
+        return result
 
     def get_routed_path(self, edge: Edge) -> RoutedPath | None:
         """Get the computed path for an edge (when pathfinding is enabled)."""

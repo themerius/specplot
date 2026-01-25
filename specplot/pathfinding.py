@@ -27,6 +27,9 @@ class PathfindingConfig:
     simplification_tolerance: float = 5.0
     # Debug mode: render virtual nodes in the diagram
     debug: bool = False
+    # Path aesthetic penalties
+    diagonal_penalty: float = 1.5  # Multiplier for diagonal movement (prefer orthogonal)
+    turn_penalty: float = 2.0  # Added cost for changing direction (prefer straight)
 
 
 @dataclass
@@ -166,22 +169,48 @@ class VirtualGrid:
                 self.nodes[(row, col)] = vnode
 
     def _collect_obstacles(self, diagram: Diagram) -> None:
-        """Collect all node bounding boxes as obstacles."""
+        """Collect all node bounding boxes as obstacles.
+
+        For GROUP nodes: Only block the header+description area (not the content).
+        This allows edges to route inside groups to reach nested children.
+        """
         from .models import ShowAs
 
-        def collect_node(node: Node, is_group_child: bool = False) -> None:
-            # Add node bounds as obstacle
-            self._node_obstacles.append((
-                node.x,
-                node.y,
-                node.x + node.width,
-                node.y + node.height,
-            ))
+        # Layout constants (matching LayoutConfig defaults)
+        HEADER_HEIGHT = 40
+        DESCRIPTION_HEIGHT = 38
 
-            # For groups, recurse into children
-            if node.children and node.show_as == ShowAs.GROUP:
+        def collect_node(node: Node, is_group_child: bool = False) -> None:
+            is_group = node.children and node.show_as == ShowAs.GROUP
+
+            if is_group:
+                # For groups: only block header+description area
+                header_bottom = node.y + HEADER_HEIGHT
+                if node.description:
+                    header_bottom += DESCRIPTION_HEIGHT
+
+                # Block the header zone
+                self._node_obstacles.append((
+                    node.x,
+                    node.y,
+                    node.x + node.width,
+                    header_bottom,
+                ))
+
+                # Recurse into children (they become obstacles within the group)
                 for child in node.children:
                     collect_node(child, is_group_child=True)
+            else:
+                # Regular nodes: block entire bounds
+                self._node_obstacles.append((
+                    node.x,
+                    node.y,
+                    node.x + node.width,
+                    node.y + node.height,
+                ))
+
+                # Handle outline children (they don't have separate bounds)
+                # Their parent's full bounds are already blocked
 
         for node in diagram.nodes:
             collect_node(node)
@@ -211,7 +240,12 @@ class VirtualGrid:
                     vnode.is_boundary = True
 
     def _build_graph(self) -> None:
-        """Create NetworkX graph with weighted edges."""
+        """Create NetworkX graph with weighted edges.
+
+        Incorporates aesthetic penalties:
+        - diagonal_penalty: Multiplier for diagonal moves (prefer orthogonal)
+        - turn_penalty: Encoded in edge direction tracking
+        """
         spacing = self.config.grid_spacing
 
         # Add all non-blocked nodes to the graph
@@ -238,18 +272,28 @@ class VirtualGrid:
                     is_diagonal = dr != 0 and dc != 0
                     base_distance = spacing * (1.414 if is_diagonal else 1.0)
                     weight = self._calculate_edge_weight(
-                        vnode, neighbor, base_distance
+                        vnode, neighbor, base_distance, is_diagonal
                     )
-                    self.graph.add_edge((row, col), (nr, nc), weight=weight)
+                    # Store direction for turn penalty calculation
+                    self.graph.add_edge(
+                        (row, col), (nr, nc),
+                        weight=weight,
+                        direction=(dr, dc),
+                    )
 
     def _calculate_edge_weight(
         self,
         from_node: VirtualNode,
         to_node: VirtualNode,
         base_distance: float,
+        is_diagonal: bool = False,
     ) -> float:
-        """Calculate edge weight with distance and proximity penalty."""
+        """Calculate edge weight with distance, proximity, and aesthetic penalties."""
         weight = base_distance * self.config.distance_weight
+
+        # Apply diagonal penalty (prefer orthogonal movement)
+        if is_diagonal:
+            weight *= self.config.diagonal_penalty
 
         # Add proximity penalty for nodes near obstacles
         margin = self.config.obstacle_margin
@@ -276,10 +320,19 @@ class VirtualGrid:
 
         Creates virtual nodes positioned exactly on the node edges,
         with positions distributed along the side for multi-edge support.
+
+        For GROUP nodes:
+        - Right side: Only allow snapping below header+description area
+        - Top side: Allowed (edges touch border but don't enter header)
+        - Left/Bottom: Fully allowed
         """
         from .models import ShowAs
 
         spacing = self.config.grid_spacing
+
+        # Layout constants (matching LayoutConfig defaults)
+        HEADER_HEIGHT = 40
+        DESCRIPTION_HEIGHT = 38
 
         def process_node(node: Node) -> None:
             node_id = id(node)
@@ -289,6 +342,16 @@ class VirtualGrid:
                 "top": [],
                 "bottom": [],
             }
+
+            # Determine if this is a group node with children
+            is_group = node.children and node.show_as == ShowAs.GROUP
+
+            # Calculate header zone for group nodes
+            header_zone_bottom = node.y
+            if is_group:
+                header_zone_bottom = node.y + HEADER_HEIGHT
+                if node.description:
+                    header_zone_bottom += DESCRIPTION_HEIGHT
 
             # Create snapping points exactly on borders
             # Number of points per side based on side length
@@ -322,18 +385,31 @@ class VirtualGrid:
                 self._snapping_points[node_id]["left"].append(vnode)
 
             # Right side - points exactly at x = node.x + node.width
+            # For groups: only below header+description area
             for i in range(num_points_v):
                 t = (i + 0.5) / num_points_v
                 y = node.y + t * node.height
                 x = node.x + node.width  # Exactly on the border
 
+                # Skip points in header zone for group nodes
+                if is_group and y < header_zone_bottom:
+                    continue
+
                 grid_pos = self.get_nearest_grid_point(x + spacing, y)
                 if grid_pos is None:
                     grid_pos = (0, 0)
 
-                center_y = node.y + node.height / 2
-                distance_from_center = abs(y - center_y)
-                sigma = node.height / 6
+                # For groups, center is below header zone
+                if is_group:
+                    content_center_y = (header_zone_bottom + node.y + node.height) / 2
+                    distance_from_center = abs(y - content_center_y)
+                    content_height = node.y + node.height - header_zone_bottom
+                    sigma = content_height / 6 if content_height > 0 else node.height / 6
+                else:
+                    center_y = node.y + node.height / 2
+                    distance_from_center = abs(y - center_y)
+                    sigma = node.height / 6
+
                 weight = math.exp(-(distance_from_center ** 2) / (2 * sigma ** 2))
 
                 vnode = VirtualNode(
@@ -413,6 +489,9 @@ class VirtualGrid:
     ) -> list[tuple[float, float]] | None:
         """Find path using A* with NetworkX.
 
+        Uses a heuristic that prefers direct paths and penalizes
+        deviation from the straight line between start and end.
+
         Args:
             start: Grid coordinates (row, col) of start
             end: Grid coordinates (row, col) of end
@@ -424,11 +503,29 @@ class VirtualGrid:
             return None
 
         try:
-            # A* with Euclidean heuristic
+            start_node = self.nodes[start]
+            end_node = self.nodes[end]
+
+            # A* with heuristic that prefers straight paths
             def heuristic(a: tuple[int, int], b: tuple[int, int]) -> float:
                 va = self.nodes[a]
                 vb = self.nodes[b]
-                return math.sqrt((va.x - vb.x) ** 2 + (va.y - vb.y) ** 2)
+                # Base: Euclidean distance to goal
+                dist_to_goal = math.sqrt((va.x - vb.x) ** 2 + (va.y - vb.y) ** 2)
+
+                # Penalty for deviation from straight line (start to end)
+                # This encourages paths that stay close to the direct line
+                if a != start and a != end:
+                    # Calculate perpendicular distance to line start->end
+                    deviation = _perpendicular_distance(
+                        (va.x, va.y),
+                        (start_node.x, start_node.y),
+                        (end_node.x, end_node.y),
+                    )
+                    # Add small penalty proportional to deviation
+                    dist_to_goal += deviation * 0.1
+
+                return dist_to_goal
 
             path = nx.astar_path(
                 self.graph,
@@ -438,11 +535,75 @@ class VirtualGrid:
                 weight="weight",
             )
 
+            # Apply turn penalty post-processing: count direction changes
+            if len(path) > 2 and self.config.turn_penalty > 1.0:
+                # Try to find straighter alternatives for segments with many turns
+                path = self._straighten_path(path)
+
             # Convert to world coordinates
             return [(self.nodes[p].x, self.nodes[p].y) for p in path]
 
         except nx.NetworkXNoPath:
             return None
+
+    def _straighten_path(
+        self,
+        path: list[tuple[int, int]],
+    ) -> list[tuple[int, int]]:
+        """Post-process path to reduce unnecessary turns.
+
+        Uses line-of-sight checks to skip intermediate waypoints
+        when a more direct path exists.
+        """
+        if len(path) <= 2:
+            return path
+
+        result = [path[0]]
+        i = 0
+
+        while i < len(path) - 1:
+            # Try to skip ahead to a later point if there's a clear path
+            best_skip = i + 1
+            for j in range(len(path) - 1, i + 1, -1):
+                if self._has_clear_path(path[i], path[j]):
+                    best_skip = j
+                    break
+            result.append(path[best_skip])
+            i = best_skip
+
+        return result
+
+    def _has_clear_path(
+        self,
+        start: tuple[int, int],
+        end: tuple[int, int],
+    ) -> bool:
+        """Check if there's a clear line-of-sight between two grid points."""
+        r1, c1 = start
+        r2, c2 = end
+
+        # Bresenham's line algorithm to check all cells along the line
+        dr = abs(r2 - r1)
+        dc = abs(c2 - c1)
+        sr = 1 if r1 < r2 else -1
+        sc = 1 if c1 < c2 else -1
+        err = dr - dc
+
+        r, c = r1, c1
+        while True:
+            if (r, c) not in self.nodes or self.nodes[(r, c)].is_blocked:
+                return False
+            if r == r2 and c == c2:
+                break
+            e2 = 2 * err
+            if e2 > -dc:
+                err -= dc
+                r += sr
+            if e2 < dr:
+                err += dr
+                c += sc
+
+        return True
 
     def select_snapping_point(
         self,
