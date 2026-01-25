@@ -25,6 +25,8 @@ class PathfindingConfig:
     obstacle_margin: float = 30.0
     # Douglas-Peucker simplification tolerance for smooth paths
     simplification_tolerance: float = 5.0
+    # Debug mode: render virtual nodes in the diagram
+    debug: bool = False
 
 
 @dataclass

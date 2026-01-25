@@ -685,11 +685,90 @@ class DiagramRenderer:
             pathfinding_config=diagram.pathfinding_config,
         )
 
+        # Render debug visualization if enabled
+        if diagram.pathfinding_config and diagram.pathfinding_config.debug:
+            self._render_debug_grid(d, edge_router)
+
         # Render edges on top (so arrowheads are visible)
         for edge in diagram.edges:
             self._render_edge(d, edge, edge_router)
 
         return d
+
+    def _render_debug_grid(self, d: draw.Drawing, edge_router: EdgeRouter) -> None:
+        """Render debug visualization of the pathfinding grid."""
+        if not edge_router._grid:
+            return
+
+        grid = edge_router._grid
+
+        # Create a group for debug elements (rendered below edges)
+        debug_group = draw.Group(opacity=0.5)
+
+        # Render all grid nodes
+        for (row, col), vnode in grid.nodes.items():
+            x, y = vnode.x, vnode.y
+
+            if vnode.is_blocked:
+                # Blocked nodes - red, smaller
+                debug_group.append(
+                    draw.Circle(
+                        x, y, 2,
+                        fill="#ef4444",  # Red
+                        stroke="none",
+                    )
+                )
+            elif vnode.is_boundary:
+                # Boundary nodes - orange
+                debug_group.append(
+                    draw.Circle(
+                        x, y, 3,
+                        fill="#f97316",  # Orange
+                        stroke="none",
+                    )
+                )
+            else:
+                # Regular grid nodes - gray, very small
+                debug_group.append(
+                    draw.Circle(
+                        x, y, 1.5,
+                        fill="#94a3b8",  # Slate
+                        stroke="none",
+                    )
+                )
+
+        # Render snapping points for each node (on top of grid)
+        snapping_group = draw.Group(opacity=0.7)
+        for node_id, sides in grid._snapping_points.items():
+            for side, points in sides.items():
+                for i, vnode in enumerate(points):
+                    # Color based on position (center = green, edges = blue)
+                    # Use snapping weight to determine color intensity
+                    weight = vnode.snapping_weight
+                    if weight < 0.3:
+                        # Near center - green
+                        fill = "#22c55e"
+                        radius = 4
+                    elif weight < 0.6:
+                        # Mid - teal
+                        fill = "#14b8a6"
+                        radius = 3.5
+                    else:
+                        # Far from center - blue
+                        fill = "#3b82f6"
+                        radius = 3
+
+                    snapping_group.append(
+                        draw.Circle(
+                            vnode.x, vnode.y, radius,
+                            fill=fill,
+                            stroke="#ffffff",
+                            stroke_width=0.5,
+                        )
+                    )
+
+        d.append(debug_group)
+        d.append(snapping_group)
 
     def _render_node(self, d: draw.Drawing, node: Node) -> None:
         """Render a single node."""
