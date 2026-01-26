@@ -319,9 +319,9 @@ class VirtualGrid:
         spacing = self.config.grid_spacing
 
         # Add all non-blocked nodes to the graph
-        # Skip header zone nodes - they act as soft-blocked (paths avoid them)
+        # Header zone nodes are included but with high edge weight penalty
         for (row, col), vnode in self.nodes.items():
-            if not vnode.is_blocked and not vnode.in_header_zone:
+            if not vnode.is_blocked:
                 self.graph.add_node((row, col), vnode=vnode)
 
         # Add edges to neighbors (4-directional + 4 diagonals)
@@ -383,6 +383,10 @@ class VirtualGrid:
         if min_dist < margin:
             penalty = self.config.proximity_penalty_weight * (margin - min_dist) / margin
             weight *= (1 + penalty)
+
+        # High cost for passing through header zones (soft penalty, not blocked)
+        if from_node.in_header_zone or to_node.in_header_zone:
+            weight *= 50.0
 
         return weight
 
