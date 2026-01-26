@@ -890,6 +890,15 @@ class DiagramRenderer:
                         stroke="none",
                     )
                 )
+            elif vnode.in_header_zone:
+                # Header zone nodes - purple (high penalty area)
+                debug_group.append(
+                    draw.Circle(
+                        x, y, 2.5,
+                        fill="#a855f7",  # Purple
+                        stroke="none",
+                    )
+                )
             elif vnode.is_boundary:
                 # Boundary nodes - orange
                 debug_group.append(

@@ -31,7 +31,7 @@ class PathfindingConfig:
     diagonal_penalty: float = 1.5  # Multiplier for diagonal movement (prefer orthogonal)
     turn_penalty: float = 2.0  # Added cost for changing direction (prefer straight)
     # Node margin: multiplier of grid_spacing for blocking area around nodes
-    node_margin: float = 3.0  # 3x grid_spacing = 45px default margin for edge corridors
+    node_margin: float = 1.5
     # Layout spacing multiplier: increases space between nodes for edge routing
     layout_spacing_multiplier: float = 2.0  # 2x = 160h/60v spacing between nodes
 
@@ -46,6 +46,7 @@ class VirtualNode:
     grid_col: int
     is_blocked: bool = False
     is_boundary: bool = False
+    in_header_zone: bool = False  # If True, this node is in/near a group header (high penalty)
     attached_node: Node | None = None
     attachment_side: str | None = None  # "left", "right", "top", "bottom"
     snapping_weight: float = 1.0  # Lower is better for snapping
@@ -265,6 +266,8 @@ class VirtualGrid:
     def _mark_obstacles_and_boundaries(self) -> None:
         """Mark grid cells as blocked or boundary based on obstacles."""
         spacing = self.config.grid_spacing
+        # Margin for header zone - nodes in this area are not routable
+        header_margin = spacing * 1.5  # Tight margin around headers
 
         for (row, col), vnode in self.nodes.items():
             x, y = vnode.x, vnode.y
@@ -286,6 +289,26 @@ class VirtualGrid:
                 if is_near_left or is_near_right or is_near_top or is_near_bottom:
                     vnode.is_boundary = True
 
+            # Mark nodes around header zone perimeter (left/top/right of header)
+            # These form a "U" shape around the header that edges cannot cross
+            for hx1, hy1, hx2, hy2 in self._header_zones:
+                # Check if node is in the header perimeter zone:
+                # 1. Top zone: above header, within x bounds
+                in_top = (hx1 - header_margin < x < hx2 + header_margin and
+                         hy1 - header_margin < y < hy1 + header_margin)
+                # 2. Left zone at header level: left edge, from top to header_bottom
+                in_left_header = (hx1 - header_margin < x < hx1 + header_margin and
+                                 hy1 - header_margin < y < hy2 + header_margin)
+                # 3. Right zone at header level: right edge, from top to header_bottom
+                in_right_header = (hx2 - header_margin < x < hx2 + header_margin and
+                                  hy1 - header_margin < y < hy2 + header_margin)
+                # 4. Inside the header area itself
+                in_header_interior = (hx1 < x < hx2 and hy1 < y < hy2)
+
+                if in_top or in_left_header or in_right_header or in_header_interior:
+                    vnode.in_header_zone = True
+                    break
+
     def _build_graph(self) -> None:
         """Create NetworkX graph with weighted edges.
 
@@ -296,8 +319,9 @@ class VirtualGrid:
         spacing = self.config.grid_spacing
 
         # Add all non-blocked nodes to the graph
+        # Skip header zone nodes - they act as soft-blocked (paths avoid them)
         for (row, col), vnode in self.nodes.items():
-            if not vnode.is_blocked:
+            if not vnode.is_blocked and not vnode.in_header_zone:
                 self.graph.add_node((row, col), vnode=vnode)
 
         # Add edges to neighbors (4-directional + 4 diagonals)
@@ -359,23 +383,6 @@ class VirtualGrid:
         if min_dist < margin:
             penalty = self.config.proximity_penalty_weight * (margin - min_dist) / margin
             weight *= (1 + penalty)
-
-        # Apply HIGH penalty for paths crossing through group header zones
-        # This is a soft constraint - paths CAN go through but strongly prefer not to
-        for hx1, hy1, hx2, hy2 in self._header_zones:
-            # Check if midpoint is inside or very near the header zone
-            in_header_x = hx1 - margin < mid_x < hx2 + margin
-            in_header_y = hy1 - margin < mid_y < hy2 + margin
-
-            if in_header_x and in_header_y:
-                # Strong penalty for being in/near header zone (10x base cost)
-                # The closer to the center of the header, the higher the penalty
-                header_center_y = (hy1 + hy2) / 2
-                dist_from_center = abs(mid_y - header_center_y)
-                header_height = hy2 - hy1
-                # Max penalty at center, decreasing towards edges
-                intensity = 1.0 - min(1.0, dist_from_center / (header_height + margin))
-                weight *= (1 + 10.0 * intensity)
 
         return weight
 
