@@ -486,7 +486,13 @@ class EdgeRouter:
             # Get source and target nodes
             if isinstance(edge.source, Node):
                 src_node = edge.source
-                src_outline_idx = None
+                # Check if this node is a DSL-created outline child
+                if (src_node._parent and
+                    src_node._parent.show_as == ShowAs.OUTLINE and
+                    src_node in src_node._parent.children):
+                    src_outline_idx = src_node._parent.children.index(src_node)
+                else:
+                    src_outline_idx = None
             elif isinstance(edge.source, OutlineItem):
                 src_node = edge.source._parent_node
                 src_outline_idx = edge.source._index
@@ -495,7 +501,13 @@ class EdgeRouter:
 
             if isinstance(edge.target, Node):
                 tgt_node = edge.target
-                tgt_outline_idx = None
+                # Check if this node is a DSL-created outline child
+                if (tgt_node._parent and
+                    tgt_node._parent.show_as == ShowAs.OUTLINE and
+                    tgt_node in tgt_node._parent.children):
+                    tgt_outline_idx = tgt_node._parent.children.index(tgt_node)
+                else:
+                    tgt_outline_idx = None
             elif isinstance(edge.target, OutlineItem):
                 tgt_node = edge.target._parent_node
                 tgt_outline_idx = edge.target._index
@@ -887,15 +899,6 @@ class DiagramRenderer:
                     draw.Circle(
                         x, y, 2,
                         fill="#ef4444",  # Red
-                        stroke="none",
-                    )
-                )
-            elif vnode.in_header_zone:
-                # Header zone nodes - purple (high penalty area)
-                debug_group.append(
-                    draw.Circle(
-                        x, y, 2.5,
-                        fill="#a855f7",  # Purple
                         stroke="none",
                     )
                 )

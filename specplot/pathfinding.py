@@ -31,7 +31,7 @@ class PathfindingConfig:
     diagonal_penalty: float = 1.5  # Multiplier for diagonal movement (prefer orthogonal)
     turn_penalty: float = 2.0  # Added cost for changing direction (prefer straight)
     # Node margin: multiplier of grid_spacing for blocking area around nodes
-    node_margin: float = 1.5
+    node_margin: float = 1.0
     # Layout spacing multiplier: increases space between nodes for edge routing
     layout_spacing_multiplier: float = 2.0  # 2x = 160h/60v spacing between nodes
 
@@ -46,7 +46,6 @@ class VirtualNode:
     grid_col: int
     is_blocked: bool = False
     is_boundary: bool = False
-    in_header_zone: bool = False  # If True, this node is in/near a group header (high penalty)
     attached_node: Node | None = None
     attachment_side: str | None = None  # "left", "right", "top", "bottom"
     snapping_weight: float = 1.0  # Lower is better for snapping
@@ -306,7 +305,7 @@ class VirtualGrid:
                 in_header_interior = (hx1 < x < hx2 and hy1 < y < hy2)
 
                 if in_top or in_left_header or in_right_header or in_header_interior:
-                    vnode.in_header_zone = True
+                    vnode.is_blocked = True  # Hard block header zones
                     break
 
     def _build_graph(self) -> None:
@@ -383,10 +382,6 @@ class VirtualGrid:
         if min_dist < margin:
             penalty = self.config.proximity_penalty_weight * (margin - min_dist) / margin
             weight *= (1 + penalty)
-
-        # High cost for passing through header zones (soft penalty, not blocked)
-        if from_node.in_header_zone or to_node.in_header_zone:
-            weight *= 50.0
 
         return weight
 

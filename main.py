@@ -1,6 +1,6 @@
 """Example usage of specplot."""
 
-from specplot import diagram, node
+from specplot import diagram, node, PathfindingConfig
 
 
 def sandwich_example():
@@ -98,8 +98,10 @@ def linux_kernel_example():
 
     Layout: User space -> Kernel (with grouped subsystems) -> Hardware
     """
+    config = PathfindingConfig(debug=True)
     with diagram(
         filename="linux_kernel",
+        pathfinding=config,
         layout=(
             ("LR",),              # User space (group)
             ("LR",),              # System call interface
