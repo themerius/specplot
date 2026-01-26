@@ -80,6 +80,37 @@ Uses [Material Symbols](https://fonts.google.com/icons) icon names. Common icons
 - `security`, `lock`, `vpn_key` - Security
 - `smart_toy`, `psychology` - AI/ML
 
+### Smart Edge Routing
+
+Enable intelligent edge routing that automatically finds paths around obstacles:
+
+```python
+from specplot import diagram, node, PathfindingConfig
+
+# Enable pathfinding with default settings
+with diagram(filename="routed", pathfinding=True):
+    ...
+
+# Or customize the routing behavior
+config = PathfindingConfig(
+    path_style="smooth",      # "smooth" (curved) or "orthogonal" (right angles)
+    diagonal_penalty=1.5,     # Higher = prefer horizontal/vertical paths
+    turn_penalty=2.0,         # Higher = prefer straighter paths
+)
+
+with diagram(filename="custom-routing", pathfinding=config):
+    user = node(icon="person", label="User")
+
+    with node(icon="cloud", label="Backend", show_as="group", grid=(2, 1)):
+        api = node(icon="api", label="API")
+        db = node(icon="database", label="Database")
+        api >> db
+
+    user >> api  # Edge automatically routes around the group boundary
+```
+
+Without pathfinding, edges use simple bezier curves that may cross through nodes. With pathfinding enabled, edges intelligently navigate around obstacles, creating cleaner diagrams.
+
 ### Themes
 
 Customize colors with a theme:

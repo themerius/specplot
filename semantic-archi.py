@@ -6,7 +6,7 @@ from specplot import diagram, node, PathfindingConfig
 def print_diagrams():
 
     with diagram(
-        filename="semantic-auth-flow",
+        filename="output/semantic-auth-flow",
         layout=(("LR",), ("LR",), ("LR",)),
         pathfinding=True
     ):
@@ -33,7 +33,7 @@ def print_diagrams():
 
     config = PathfindingConfig(debug=False)
     with diagram(
-        filename="semantic-data-flow",
+        filename="output/semantic-data-flow",
         layout=(("LR",), ("LR",)),
         pathfinding=config
     ):
@@ -70,7 +70,7 @@ def print_diagrams():
 
 
     with diagram(
-        filename="semantic-swarm-architecture",
+        filename="output/semantic-swarm-architecture",
         layout=(("LR",), ("LR",)),
         pathfinding=config
     ):
@@ -78,7 +78,7 @@ def print_diagrams():
 
 
     with diagram(
-        filename="semantic-aware-dsl",
+        filename="output/semantic-aware-dsl",
         layout=(("LR",), ("LR",)),
         pathfinding=config
     ):

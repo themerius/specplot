@@ -6,7 +6,7 @@ from specplot import diagram, node, PathfindingConfig
 def sandwich_example():
     """Create a sandwich layout example (3 rows: 1 zone, 3 zones, 1 zone)."""
     with diagram(
-        filename="sandwich_example",
+        filename="output/sandwich_example",
         layout=(("LR",), ("TB", "TB", "TB"), ("LR",))
     ):
         # pos=1: top LR zone
@@ -39,7 +39,7 @@ def sandwich_example():
 
 def main():
     """Create an example architecture diagram."""
-    with diagram(filename="example"):
+    with diagram(filename="output/example"):
         # Simple node - no 'with' needed when no children
         user = node(icon="person", label="User")
 
@@ -100,7 +100,7 @@ def linux_kernel_example():
     """
     config = PathfindingConfig(debug=True)
     with diagram(
-        filename="linux_kernel",
+        filename="output/linux_kernel",
         pathfinding=config,
         layout=(
             ("LR",),              # User space (group)

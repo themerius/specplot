@@ -1,4 +1,62 @@
-"""Grid-based A* pathfinding for edge routing using NetworkX."""
+"""Grid-based A* pathfinding for edge routing using NetworkX.
+
+Overview
+--------
+This module implements intelligent edge routing that finds paths around obstacles
+(nodes) rather than drawing simple straight lines or bezier curves that may cross
+through diagram elements.
+
+The core idea is to overlay a virtual grid on the diagram, mark node areas as
+obstacles, and use A* search to find optimal paths between connection points.
+
+Architecture
+------------
+1. **VirtualGrid**: A NetworkX graph where each cell is a node connected to its
+   neighbors. Cells inside node boundaries are marked as blocked (obstacles).
+   The grid resolution is configurable via `grid_spacing`.
+
+2. **Snapping Points**: Instead of connecting edges to arbitrary points on nodes,
+   we pre-compute "snapping points" distributed along each node's border. These
+   points have Gaussian-weighted preferences (center positions preferred) and
+   support restrictions like `no_entry` for protected zones.
+
+3. **A* Pathfinding**: Given source and target snapping points, A* finds the
+   shortest path through the grid while avoiding obstacles. Custom heuristics
+   penalize diagonal movement and direction changes to produce cleaner paths.
+
+4. **Path Simplification**: Raw A* paths have many waypoints. Douglas-Peucker
+   algorithm simplifies them while preserving shape. Final rendering adds
+   rounded corners at remaining waypoints for smooth curves.
+
+Key Classes
+-----------
+- PathfindingConfig: User-facing configuration (grid spacing, penalties, style)
+- VirtualNode: A point in the routing grid with obstacle/boundary metadata
+- VirtualGrid: The NetworkX graph with obstacle marking and A* implementation
+- RoutedPath: Result container with waypoints and connection metadata
+
+Integration
+-----------
+The EdgeRouter class in renderer.py uses VirtualGrid to:
+1. Generate the grid from diagram bounds
+2. Mark all nodes as obstacles
+3. Compute snapping points for each node
+4. Route each edge using A* between optimal snapping points
+5. Simplify and render the resulting paths
+
+Usage
+-----
+Enable pathfinding by passing `pathfinding=True` or a PathfindingConfig to
+the diagram context manager:
+
+    with diagram(filename="example", pathfinding=True):
+        ...
+
+    # Or with custom settings:
+    config = PathfindingConfig(path_style="orthogonal", debug=True)
+    with diagram(filename="example", pathfinding=config):
+        ...
+"""
 
 from __future__ import annotations
 
