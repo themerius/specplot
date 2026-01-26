@@ -159,7 +159,7 @@ class NodeContext:
 
 
 def node(
-    icon: str | None = None,
+    icon: str | None = "draft",
     label: str = "",
     description: str | None = None,
     show_as: ShowAsLiteral | ShowAs = "outline",

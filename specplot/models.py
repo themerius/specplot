@@ -71,6 +71,9 @@ class Node:
 
     def __rshift__(self, other: Node | OutlineItem) -> Edge:
         """Create an edge from this node to another (->)."""
+        # Unwrap NodeContext if needed (duck-typed to avoid circular import)
+        if hasattr(other, '_node'):
+            other = other._node
         edge = Edge(source=self, target=other, style=EdgeStyle.ARROW_RIGHT)
         if self._diagram:
             self._diagram.edges.append(edge)
@@ -79,6 +82,9 @@ class Node:
 
     def __lshift__(self, other: Node | OutlineItem) -> Edge:
         """Create an edge to this node from another (<-)."""
+        # Unwrap NodeContext if needed (duck-typed to avoid circular import)
+        if hasattr(other, '_node'):
+            other = other._node
         edge = Edge(source=other, target=self, style=EdgeStyle.ARROW_RIGHT)
         if self._diagram:
             self._diagram.edges.append(edge)
@@ -87,6 +93,9 @@ class Node:
 
     def __sub__(self, other: Node | OutlineItem) -> Edge:
         """Create an undirected edge (--)."""
+        # Unwrap NodeContext if needed (duck-typed to avoid circular import)
+        if hasattr(other, '_node'):
+            other = other._node
         edge = Edge(source=self, target=other, style=EdgeStyle.LINE)
         if self._diagram:
             self._diagram.edges.append(edge)

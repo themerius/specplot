@@ -513,7 +513,6 @@ class VirtualGrid:
                     grid_row=grid_pos[0], grid_col=grid_pos[1],
                     is_boundary=True, attached_node=node,
                     attachment_side="top", snapping_weight=1 - weight,
-                    no_entry=is_group,  # Group nodes: top side is header zone (no entry)
                 )
                 self._snapping_points[node_id]["top"].append(vnode)
 
