@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="936.0" height="544" viewBox="0 0 936.0 544">
+<defs>
+</defs>
+<rect x="0" y="0" width="936.0" height="544" fill="#ffffff" />
+<rect x="56.0" y="40" width="200" height="78" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5" rx="6" ry="6" />
+<rect x="56.0" y="40" width="200" height="40" fill="#e2e8f0" stroke="none" rx="6" ry="6" />
+<rect x="56.0" y="74" width="200" height="6" fill="#e2e8f0" stroke="none" />
+<path d="M56.0,80 L256.0,80" stroke="#cbd5e1" stroke-width="1" />
+<g transform="translate(68.0, 70.0) scale(0.020833333333333332)">
+<path d="m422-232 207-248H469l29-227-185 267h139l-30 208ZM320-80l40-280H160l360-520h80l-40 320h240L400-80h-80Zm151-390Z" fill="#475569" />
+</g>
+<text x="96.0" y="60.0" font-size="14" fill="#1e293b" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-weight="500" dominant-baseline="middle">Initiating Event</text>
+<text x="68.0" y="99.0" font-size="11" fill="#64748b" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" dominant-baseline="middle">Triggers the flow</text>
+<rect x="352.0" y="40" width="232" height="274" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.5" rx="6" ry="6" />
+<rect x="352.0" y="40" width="232" height="40" fill="#e2e8f0" stroke="none" rx="6" ry="6" />
+<rect x="352.0" y="74" width="232" height="6" fill="#e2e8f0" stroke="none" />
+<path d="M352.0,80 L584.0,80" stroke="#94a3b8" stroke-width="1" />
+<g transform="translate(364.0, 70.0) scale(0.020833333333333332)">
+<path d="M280-120 80-320l200-200 57 56-104 104h607v80H233l104 104-57 56Zm400-320-57-56 104-104H120v-80h607L623-784l57-56 200 200-200 200Z" fill="#475569" />
+</g>
+<text x="392.0" y="60.0" font-size="14" fill="#1e293b" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-weight="500" dominant-baseline="middle">Event Channels</text>
+<text x="364.0" y="99.0" font-size="11" fill="#64748b" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" dominant-baseline="middle">Message broker</text>
+<path d="M352.0,118 L584.0,118" stroke="#94a3b8" stroke-width="0.5" stroke-dasharray="3,2" />
+<rect x="368.0" y="122" width="200" height="40" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5" rx="6" ry="6" />
+<rect x="368.0" y="122" width="200" height="40" fill="#e2e8f0" stroke="none" rx="6" ry="6" />
+<rect x="368.0" y="156" width="200" height="6" fill="#e2e8f0" stroke="none" />
+<path d="M368.0,162 L568.0,162" stroke="#cbd5e1" stroke-width="1" />
+<g transform="translate(380.0, 152.0) scale(0.020833333333333332)">
+<path d="M440-640v-120H280v-80h400v80H520v120h-80ZM160-120v-320h80v40h120v-120h-40v-80h320v80h-40v120h120v-40h80v320h-80v-40H240v40h-80Zm80-120h480v-80H520v-200h-80v200H240v80Zm240 0Z" fill="#475569" />
+</g>
+<text x="408.0" y="142.0" font-size="14" fill="#1e293b" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-weight="500" dominant-baseline="middle">Event Channel 1</text>
+<rect x="368.0" y="192" width="200" height="40" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5" rx="6" ry="6" />
+<rect x="368.0" y="192" width="200" height="40" fill="#e2e8f0" stroke="none" rx="6" ry="6" />
+<rect x="368.0" y="226" width="200" height="6" fill="#e2e8f0" stroke="none" />
+<path d="M368.0,232 L568.0,232" stroke="#cbd5e1" stroke-width="1" />
+<g transform="translate(380.0, 222.0) scale(0.020833333333333332)">
+<path d="M440-640v-120H280v-80h400v80H520v120h-80ZM160-120v-320h80v40h120v-120h-40v-80h320v80h-40v120h120v-40h80v320h-80v-40H240v40h-80Zm80-120h480v-80H520v-200h-80v200H240v80Zm240 0Z" fill="#475569" />
+</g>
+<text x="408.0" y="212.0" font-size="14" fill="#1e293b" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-weight="500" dominant-baseline="middle">Event Channel 2</text>
+<rect x="368.0" y="262" width="200" height="40" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5" rx="6" ry="6" />
+<rect x="368.0" y="262" width="200" height="40" fill="#e2e8f0" stroke="none" rx="6" ry="6" />
+<rect x="368.0" y="296" width="200" height="6" fill="#e2e8f0" stroke="none" />
+<path d="M368.0,302 L568.0,302" stroke="#cbd5e1" stroke-width="1" />
+<g transform="translate(380.0, 292.0) scale(0.020833333333333332)">
+<path d="M440-640v-120H280v-80h400v80H520v120h-80ZM160-120v-320h80v40h120v-120h-40v-80h320v80h-40v120h120v-40h80v320h-80v-40H240v40h-80Zm80-120h480v-80H520v-200h-80v200H240v80Zm240 0Z" fill="#475569" />
+</g>
+<text x="408.0" y="282.0" font-size="14" fill="#1e293b" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-weight="500" dominant-baseline="middle">Event Channel 3</text>
+<rect x="56.0" y="148" width="200" height="84" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5" rx="6" ry="6" />
+<rect x="56.0" y="148" width="200" height="40" fill="#e2e8f0" stroke="none" rx="6" ry="6" />
+<rect x="56.0" y="182" width="200" height="6" fill="#e2e8f0" stroke="none" />
+<path d="M56.0,188 L256.0,188" stroke="#cbd5e1" stroke-width="1" />
+<g transform="translate(68.0, 178.0) scale(0.020833333333333332)">
+<path d="m370-80-16-128q-13-5-24.5-12T307-235l-119 50L78-375l103-78q-1-7-1-13.5v-27q0-6.5 1-13.5L78-585l110-190 119 50q11-8 23-15t24-12l16-128h220l16 128q13 5 24.5 12t22.5 15l119-50 110 190-103 78q1 7 1 13.5v27q0 6.5-2 13.5l103 78-110 190-118-50q-11 8-23 15t-24 12L590-80H370Zm70-80h79l14-106q31-8 57.5-23.5T639-327l99 41 39-68-86-65q5-14 7-29.5t2-31.5q0-16-2-31.5t-7-29.5l86-65-39-68-99 42q-22-23-48.5-38.5T533-694l-13-106h-79l-14 106q-31 8-57.5 23.5T321-633l-99-41-39 68 86 64q-5 15-7 30t-2 32q0 16 2 31t7 30l-86 65 39 68 99-42q22 23 48.5 38.5T427-266l13 106Zm42-180q58 0 99-41t41-99q0-58-41-99t-99-41q-59 0-99.5 41T342-480q0 58 40.5 99t99.5 41Zm-2-140Z" fill="#475569" />
+</g>
+<text x="96.0" y="168.0" font-size="14" fill="#1e293b" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-weight="500" dominant-baseline="middle">Processor</text>
+<text x="68.0" y="199.0" font-size="11" fill="#64748b" font-family="JetBrains Mono, Consolas, monospace" dominant-baseline="middle">• Component</text>
+<text x="68.0" y="221.0" font-size="11" fill="#64748b" font-family="JetBrains Mono, Consolas, monospace" dominant-baseline="middle">• Component</text>
+<rect x="40.0" y="262" width="232" height="236" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.5" rx="6" ry="6" />
+<rect x="40.0" y="262" width="232" height="40" fill="#e2e8f0" stroke="none" rx="6" ry="6" />
+<rect x="40.0" y="296" width="232" height="6" fill="#e2e8f0" stroke="none" />
+<path d="M40.0,302 L272.0,302" stroke="#94a3b8" stroke-width="1" />
+<g transform="translate(52.0, 292.0) scale(0.020833333333333332)">
+<path d="m370-80-16-128q-13-5-24.5-12T307-235l-119 50L78-375l103-78q-1-7-1-13.5v-27q0-6.5 1-13.5L78-585l110-190 119 50q11-8 23-15t24-12l16-128h220l16 128q13 5 24.5 12t22.5 15l119-50 110 190-103 78q1 7 1 13.5v27q0 6.5-2 13.5l103 78-110 190-118-50q-11 8-23 15t-24 12L590-80H370Zm70-80h79l14-106q31-8 57.5-23.5T639-327l99 41 39-68-86-65q5-14 7-29.5t2-31.5q0-16-2-31.5t-7-29.5l86-65-39-68-99 42q-22-23-48.5-38.5T533-694l-13-106h-79l-14 106q-31 8-57.5 23.5T321-633l-99-41-39 68 86 64q-5 15-7 30t-2 32q0 16 2 31t7 30l-86 65 39 68 99-42q22 23 48.5 38.5T427-266l13 106Zm42-180q58 0 99-41t41-99q0-58-41-99t-99-41q-59 0-99.5 41T342-480q0 58 40.5 99t99.5 41Zm-2-140Z" fill="#475569" />
+</g>
+<text x="80.0" y="282.0" font-size="14" fill="#1e293b" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-weight="500" dominant-baseline="middle">Processor</text>
+<rect x="56.0" y="306" width="200" height="40" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5" rx="6" ry="6" />
+<rect x="56.0" y="306" width="200" height="40" fill="#e2e8f0" stroke="none" rx="6" ry="6" />
+<rect x="56.0" y="340" width="200" height="6" fill="#e2e8f0" stroke="none" />
+<path d="M56.0,346 L256.0,346" stroke="#cbd5e1" stroke-width="1" />
+<g transform="translate(68.0, 336.0) scale(0.020833333333333332)">
+<path d="M240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h320l240 240v480q0 33-23.5 56.5T720-80H240Zm280-520v-200H240v640h480v-440H520ZM240-800v200-200 640-640Z" fill="#475569" />
+</g>
+<text x="96.0" y="326.0" font-size="14" fill="#1e293b" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-weight="500" dominant-baseline="middle">Component</text>
+<rect x="56.0" y="376" width="200" height="40" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5" rx="6" ry="6" />
+<rect x="56.0" y="376" width="200" height="40" fill="#e2e8f0" stroke="none" rx="6" ry="6" />
+<rect x="56.0" y="410" width="200" height="6" fill="#e2e8f0" stroke="none" />
+<path d="M56.0,416 L256.0,416" stroke="#cbd5e1" stroke-width="1" />
+<g transform="translate(68.0, 406.0) scale(0.020833333333333332)">
+<path d="M240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h320l240 240v480q0 33-23.5 56.5T720-80H240Zm280-520v-200H240v640h480v-440H520ZM240-800v200-200 640-640Z" fill="#475569" />
+</g>
+<text x="96.0" y="396.0" font-size="14" fill="#1e293b" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-weight="500" dominant-baseline="middle">Component</text>
+<rect x="56.0" y="446" width="200" height="40" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5" rx="6" ry="6" />
+<rect x="56.0" y="446" width="200" height="40" fill="#e2e8f0" stroke="none" rx="6" ry="6" />
+<rect x="56.0" y="480" width="200" height="6" fill="#e2e8f0" stroke="none" />
+<path d="M56.0,486 L256.0,486" stroke="#cbd5e1" stroke-width="1" />
+<g transform="translate(68.0, 476.0) scale(0.020833333333333332)">
+<path d="m422-232 207-248H469l29-227-185 267h139l-30 208ZM320-80l40-280H160l360-520h80l-40 320h240L400-80h-80Zm151-390Z" fill="#475569" />
+</g>
+<text x="96.0" y="466.0" font-size="14" fill="#1e293b" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-weight="500" dominant-baseline="middle">Processing Event</text>
+<rect x="664.0" y="40" width="232" height="236" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.5" rx="6" ry="6" />
+<rect x="664.0" y="40" width="232" height="40" fill="#e2e8f0" stroke="none" rx="6" ry="6" />
+<rect x="664.0" y="74" width="232" height="6" fill="#e2e8f0" stroke="none" />
+<path d="M664.0,80 L896.0,80" stroke="#94a3b8" stroke-width="1" />
+<g transform="translate(676.0, 70.0) scale(0.020833333333333332)">
+<path d="m370-80-16-128q-13-5-24.5-12T307-235l-119 50L78-375l103-78q-1-7-1-13.5v-27q0-6.5 1-13.5L78-585l110-190 119 50q11-8 23-15t24-12l16-128h220l16 128q13 5 24.5 12t22.5 15l119-50 110 190-103 78q1 7 1 13.5v27q0 6.5-2 13.5l103 78-110 190-118-50q-11 8-23 15t-24 12L590-80H370Zm70-80h79l14-106q31-8 57.5-23.5T639-327l99 41 39-68-86-65q5-14 7-29.5t2-31.5q0-16-2-31.5t-7-29.5l86-65-39-68-99 42q-22-23-48.5-38.5T533-694l-13-106h-79l-14 106q-31 8-57.5 23.5T321-633l-99-41-39 68 86 64q-5 15-7 30t-2 32q0 16 2 31t7 30l-86 65 39 68 99-42q22 23 48.5 38.5T427-266l13 106Zm42-180q58 0 99-41t41-99q0-58-41-99t-99-41q-59 0-99.5 41T342-480q0 58 40.5 99t99.5 41Zm-2-140Z" fill="#475569" />
+</g>
+<text x="704.0" y="60.0" font-size="14" fill="#1e293b" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-weight="500" dominant-baseline="middle">Processor</text>
+<rect x="680.0" y="84" width="200" height="40" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5" rx="6" ry="6" />
+<rect x="680.0" y="84" width="200" height="40" fill="#e2e8f0" stroke="none" rx="6" ry="6" />
+<rect x="680.0" y="118" width="200" height="6" fill="#e2e8f0" stroke="none" />
+<path d="M680.0,124 L880.0,124" stroke="#cbd5e1" stroke-width="1" />
+<g transform="translate(692.0, 114.0) scale(0.020833333333333332)">
+<path d="M240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h320l240 240v480q0 33-23.5 56.5T720-80H240Zm280-520v-200H240v640h480v-440H520ZM240-800v200-200 640-640Z" fill="#475569" />
+</g>
+<text x="720.0" y="104.0" font-size="14" fill="#1e293b" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-weight="500" dominant-baseline="middle">Component</text>
+<rect x="680.0" y="154" width="200" height="40" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5" rx="6" ry="6" />
+<rect x="680.0" y="154" width="200" height="40" fill="#e2e8f0" stroke="none" rx="6" ry="6" />
+<rect x="680.0" y="188" width="200" height="6" fill="#e2e8f0" stroke="none" />
+<path d="M680.0,194 L880.0,194" stroke="#cbd5e1" stroke-width="1" />
+<g transform="translate(692.0, 184.0) scale(0.020833333333333332)">
+<path d="M240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h320l240 240v480q0 33-23.5 56.5T720-80H240Zm280-520v-200H240v640h480v-440H520ZM240-800v200-200 640-640Z" fill="#475569" />
+</g>
+<text x="720.0" y="174.0" font-size="14" fill="#1e293b" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-weight="500" dominant-baseline="middle">Component</text>
+<rect x="680.0" y="224" width="200" height="40" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5" rx="6" ry="6" />
+<rect x="680.0" y="224" width="200" height="40" fill="#e2e8f0" stroke="none" rx="6" ry="6" />
+<rect x="680.0" y="258" width="200" height="6" fill="#e2e8f0" stroke="none" />
+<path d="M680.0,264 L880.0,264" stroke="#cbd5e1" stroke-width="1" />
+<g transform="translate(692.0, 254.0) scale(0.020833333333333332)">
+<path d="m422-232 207-248H469l29-227-185 267h139l-30 208ZM320-80l40-280H160l360-520h80l-40 320h240L400-80h-80Zm151-390Z" fill="#475569" />
+</g>
+<text x="720.0" y="244.0" font-size="14" fill="#1e293b" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-weight="500" dominant-baseline="middle">Processing Event</text>
+<rect x="680.0" y="306" width="200" height="84" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5" rx="6" ry="6" />
+<rect x="680.0" y="306" width="200" height="40" fill="#e2e8f0" stroke="none" rx="6" ry="6" />
+<rect x="680.0" y="340" width="200" height="6" fill="#e2e8f0" stroke="none" />
+<path d="M680.0,346 L880.0,346" stroke="#cbd5e1" stroke-width="1" />
+<g transform="translate(692.0, 336.0) scale(0.020833333333333332)">
+<path d="m370-80-16-128q-13-5-24.5-12T307-235l-119 50L78-375l103-78q-1-7-1-13.5v-27q0-6.5 1-13.5L78-585l110-190 119 50q11-8 23-15t24-12l16-128h220l16 128q13 5 24.5 12t22.5 15l119-50 110 190-103 78q1 7 1 13.5v27q0 6.5-2 13.5l103 78-110 190-118-50q-11 8-23 15t-24 12L590-80H370Zm70-80h79l14-106q31-8 57.5-23.5T639-327l99 41 39-68-86-65q5-14 7-29.5t2-31.5q0-16-2-31.5t-7-29.5l86-65-39-68-99 42q-22-23-48.5-38.5T533-694l-13-106h-79l-14 106q-31 8-57.5 23.5T321-633l-99-41-39 68 86 64q-5 15-7 30t-2 32q0 16 2 31t7 30l-86 65 39 68 99-42q22 23 48.5 38.5T427-266l13 106Zm42-180q58 0 99-41t41-99q0-58-41-99t-99-41q-59 0-99.5 41T342-480q0 58 40.5 99t99.5 41Zm-2-140Z" fill="#475569" />
+</g>
+<text x="720.0" y="326.0" font-size="14" fill="#1e293b" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-weight="500" dominant-baseline="middle">Processor</text>
+<text x="692.0" y="357.0" font-size="11" fill="#64748b" font-family="JetBrains Mono, Consolas, monospace" dominant-baseline="middle">• Component</text>
+<text x="692.0" y="379.0" font-size="11" fill="#64748b" font-family="JetBrains Mono, Consolas, monospace" dominant-baseline="middle">• Component</text>
+<rect x="680.0" y="420" width="200" height="84" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5" rx="6" ry="6" />
+<rect x="680.0" y="420" width="200" height="40" fill="#e2e8f0" stroke="none" rx="6" ry="6" />
+<rect x="680.0" y="454" width="200" height="6" fill="#e2e8f0" stroke="none" />
+<path d="M680.0,460 L880.0,460" stroke="#cbd5e1" stroke-width="1" />
+<g transform="translate(692.0, 450.0) scale(0.020833333333333332)">
+<path d="m370-80-16-128q-13-5-24.5-12T307-235l-119 50L78-375l103-78q-1-7-1-13.5v-27q0-6.5 1-13.5L78-585l110-190 119 50q11-8 23-15t24-12l16-128h220l16 128q13 5 24.5 12t22.5 15l119-50 110 190-103 78q1 7 1 13.5v27q0 6.5-2 13.5l103 78-110 190-118-50q-11 8-23 15t-24 12L590-80H370Zm70-80h79l14-106q31-8 57.5-23.5T639-327l99 41 39-68-86-65q5-14 7-29.5t2-31.5q0-16-2-31.5t-7-29.5l86-65-39-68-99 42q-22-23-48.5-38.5T533-694l-13-106h-79l-14 106q-31 8-57.5 23.5T321-633l-99-41-39 68 86 64q-5 15-7 30t-2 32q0 16 2 31t7 30l-86 65 39 68 99-42q22 23 48.5 38.5T427-266l13 106Zm42-180q58 0 99-41t41-99q0-58-41-99t-99-41q-59 0-99.5 41T342-480q0 58 40.5 99t99.5 41Zm-2-140Z" fill="#475569" />
+</g>
+<text x="720.0" y="440.0" font-size="14" fill="#1e293b" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-weight="500" dominant-baseline="middle">Processor</text>
+<text x="692.0" y="471.0" font-size="11" fill="#64748b" font-family="JetBrains Mono, Consolas, monospace" dominant-baseline="middle">• Component</text>
+<text x="692.0" y="493.0" font-size="11" fill="#64748b" font-family="JetBrains Mono, Consolas, monospace" dominant-baseline="middle">• Component</text>
+<path d="M256.0,79.0 C312.0,79.0,312.0,142.0,368.0,142.0" stroke="#64748b" stroke-width="1.5" fill="none" stroke-dasharray="5,5" />
+<path d="M368.0,142.0 L361.0717967697245,146.0 L361.0717967697245,138.0 L368.0,142.0" fill="#64748b" stroke="none" />
+<path d="M568.0,142.0 C618.0,142.0,614.0,158.0,664.0,158.0" stroke="#64748b" stroke-width="1.5" fill="none" stroke-dasharray="5,5" />
+<path d="M664.0,158.0 L657.0717967697245,162.0 L657.0717967697245,154.0 L664.0,158.0" fill="#64748b" stroke="none" />
+<path d="M680.0,244.0 C624.0,244.0,624.0,204.5,568.0,204.5" stroke="#64748b" stroke-width="1.5" fill="none" stroke-dasharray="5,5" />
+<path d="M568.0,204.5 L574.9282032302755,200.5 L574.9282032302755,208.5 L568.0,204.5" fill="#64748b" stroke="none" />
+<path d="M368.0,204.5 C312.0,204.5,312.0,190.0,256.0,190.0" stroke="#64748b" stroke-width="1.5" fill="none" stroke-dasharray="5,5" />
+<path d="M256.0,190.0 L262.9282032302755,186.0 L262.9282032302755,194.0 L256.0,190.0" fill="#64748b" stroke="none" />
+<path d="M568.0,219.5 C624.0,219.5,624.0,348.0,680.0,348.0" stroke="#64748b" stroke-width="1.5" fill="none" stroke-dasharray="5,5" />
+<path d="M680.0,348.0 L673.0717967697245,352.0 L673.0717967697245,344.0 L680.0,348.0" fill="#64748b" stroke="none" />
+<path d="M368.0,219.5 C318.0,219.5,322.0,380.0,272.0,380.0" stroke="#64748b" stroke-width="1.5" fill="none" stroke-dasharray="5,5" />
+<path d="M272.0,380.0 L278.9282032302755,376.0 L278.9282032302755,384.0 L272.0,380.0" fill="#64748b" stroke="none" />
+<path d="M256.0,466.0 C312.0,466.0,312.0,282.0,368.0,282.0" stroke="#64748b" stroke-width="1.5" fill="none" stroke-dasharray="5,5" />
+<path d="M368.0,282.0 L361.0717967697245,286.0 L361.0717967697245,278.0 L368.0,282.0" fill="#64748b" stroke="none" />
+<path d="M568.0,282.0 C624.0,282.0,624.0,462.0,680.0,462.0" stroke="#64748b" stroke-width="1.5" fill="none" stroke-dasharray="5,5" />
+<path d="M680.0,462.0 L673.0717967697245,466.0 L673.0717967697245,458.0 L680.0,462.0" fill="#64748b" stroke="none" />
+</svg>
