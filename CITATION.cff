@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "specplot"
+abstract: "A Python library for building outline-based architecture diagrams"
+authors:
+  - family-names: "Hodapp"
+    given-names: "Sven"
+repository-code: "https://github.com/themerius/specplot"
+license: MIT
+date-released: 2026-01
+keywords:
+  - architecture
+  - diagrams
+  - software-architecture
+  - python
+  - svg
+  - documentation
