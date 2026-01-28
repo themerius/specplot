@@ -112,8 +112,8 @@ def estimate_text_width(text: str, char_width: float) -> float:
 
 
 def calculate_node_dimensions(
-    node: Node,
-    config: LayoutConfig,
+        node: Node,
+        config: LayoutConfig,
 ) -> tuple[float, float]:
     """Calculate the width and height needed for a node.
 
@@ -162,10 +162,10 @@ def calculate_node_dimensions(
                     row_heights[row] = max(row_heights[row], ch)
 
             group_content_width = (
-                sum(col_widths) + config.node_spacing_h * (cols - 1)
+                    sum(col_widths) + config.node_spacing_h * (cols - 1)
             )
             group_content_height = (
-                sum(row_heights) + config.node_spacing_v * (rows - 1)
+                    sum(row_heights) + config.node_spacing_v * (rows - 1)
             )
 
             # Group width accommodates children plus padding
@@ -354,7 +354,7 @@ def layout_diagram(diagram: Diagram, config: LayoutConfig | None = None) -> None
 
 
 def get_node_connection_point(
-    node: Node, direction: str = "right"
+        node: Node, direction: str = "right"
 ) -> tuple[float, float]:
     """Get the connection point for edges on a node.
 
@@ -378,7 +378,7 @@ def get_node_connection_point(
 
 
 def get_outline_item_connection_point(
-    node: Node, item_index: int, direction: str = "right", config: LayoutConfig | None = None
+        node: Node, item_index: int, direction: str = "right", config: LayoutConfig | None = None
 ) -> tuple[float, float]:
     """Get connection point for an outline item."""
     if config is None:

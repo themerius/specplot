@@ -18,16 +18,15 @@ with diagram(filename="architecture"):
     user = node(icon="person", label="User")
 
     with node(
-        icon="cloud", label="Our WebApp",
-        description="Layered architecture style.",
-        show_as="group", grid=(3, 1)
+            icon="cloud", label="Our WebApp",
+            description="Layered architecture style.",
+            show_as="group", grid=(3, 1)
     ) as app:
-
         node(icon="web", label="Presentation Layer",
              description="User interface components")
         node(icon="account_tree", label="Business Layer",
              description="Business logic and rules")
-        persistance = node(icon="storage", label="Persistence Layer",
+        persistence = node(icon="storage", label="Persistence Layer",
                            description="Data access and ORM")
 
     with node(icon="database", label="Database Layer", show_as="outline") as dbs:

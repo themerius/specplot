@@ -125,9 +125,9 @@ class VirtualGrid:
     """Routing grid with NetworkX graph for A* pathfinding."""
 
     def __init__(
-        self,
-        bounds: tuple[float, float, float, float],
-        config: PathfindingConfig,
+            self,
+            bounds: tuple[float, float, float, float],
+            config: PathfindingConfig,
     ):
         """Initialize the grid.
 
@@ -145,9 +145,9 @@ class VirtualGrid:
 
     @classmethod
     def generate(
-        cls,
-        diagram: Diagram,
-        config: PathfindingConfig,
+            cls,
+            diagram: Diagram,
+            config: PathfindingConfig,
     ) -> VirtualGrid:
         """Build grid after layout, mark obstacles, compute snapping weights.
 
@@ -183,8 +183,8 @@ class VirtualGrid:
 
     @staticmethod
     def _compute_bounds(
-        diagram: Diagram,
-        padding: float,
+            diagram: Diagram,
+            padding: float,
     ) -> tuple[float, float, float, float]:
         """Compute diagram bounds including all nodes."""
         if not diagram.nodes:
@@ -333,7 +333,7 @@ class VirtualGrid:
                 # Check if point is inside the obstacle (with small inset)
                 inset = spacing * 0.3
                 if (ox1 + inset < x < ox2 - inset and
-                    oy1 + inset < y < oy2 - inset):
+                        oy1 + inset < y < oy2 - inset):
                     vnode.is_blocked = True
                     break
 
@@ -352,13 +352,13 @@ class VirtualGrid:
                 # Check if node is in the header perimeter zone:
                 # 1. Top zone: above header, within x bounds
                 in_top = (hx1 - header_margin < x < hx2 + header_margin and
-                         hy1 - header_margin < y < hy1 + header_margin)
+                          hy1 - header_margin < y < hy1 + header_margin)
                 # 2. Left zone at header level: left edge, from top to header_bottom
                 in_left_header = (hx1 - header_margin < x < hx1 + header_margin and
-                                 hy1 - header_margin < y < hy2 + header_margin)
+                                  hy1 - header_margin < y < hy2 + header_margin)
                 # 3. Right zone at header level: right edge, from top to header_bottom
                 in_right_header = (hx2 - header_margin < x < hx2 + header_margin and
-                                  hy1 - header_margin < y < hy2 + header_margin)
+                                   hy1 - header_margin < y < hy2 + header_margin)
                 # 4. Inside the header area itself
                 in_header_interior = (hx1 < x < hx2 and hy1 < y < hy2)
 
@@ -410,11 +410,11 @@ class VirtualGrid:
                     )
 
     def _calculate_edge_weight(
-        self,
-        from_node: VirtualNode,
-        to_node: VirtualNode,
-        base_distance: float,
-        is_diagonal: bool = False,
+            self,
+            from_node: VirtualNode,
+            to_node: VirtualNode,
+            base_distance: float,
+            is_diagonal: bool = False,
     ) -> float:
         """Calculate edge weight with distance, proximity, and aesthetic penalties."""
         weight = base_distance * self.config.distance_weight
@@ -614,9 +614,9 @@ class VirtualGrid:
             process_node(node)
 
     def find_path(
-        self,
-        start: tuple[int, int],
-        end: tuple[int, int],
+            self,
+            start: tuple[int, int],
+            end: tuple[int, int],
     ) -> list[tuple[float, float]] | None:
         """Find path using A* with NetworkX.
 
@@ -689,8 +689,8 @@ class VirtualGrid:
             return None
 
     def _straighten_path(
-        self,
-        path: list[tuple[int, int]],
+            self,
+            path: list[tuple[int, int]],
     ) -> list[tuple[int, int]]:
         """Post-process path to reduce unnecessary turns.
 
@@ -716,9 +716,9 @@ class VirtualGrid:
         return result
 
     def _has_clear_path(
-        self,
-        start: tuple[int, int],
-        end: tuple[int, int],
+            self,
+            start: tuple[int, int],
+            end: tuple[int, int],
     ) -> bool:
         """Check if there's a clear line-of-sight between two grid points."""
         r1, c1 = start
@@ -748,12 +748,12 @@ class VirtualGrid:
         return True
 
     def select_snapping_point(
-        self,
-        node: Node,
-        side: str,
-        occupied: set[tuple[int, int]],
-        target_y: float | None = None,
-        is_target: bool = False,
+            self,
+            node: Node,
+            side: str,
+            occupied: set[tuple[int, int]],
+            target_y: float | None = None,
+            is_target: bool = False,
     ) -> VirtualNode | None:
         """Select best snapping point for a node side.
 
@@ -800,12 +800,12 @@ class VirtualGrid:
         return available[0] if available else None
 
     def select_distributed_snapping_point(
-        self,
-        node: Node,
-        side: str,
-        edge_index: int,
-        total_edges: int,
-        is_target: bool = False,
+            self,
+            node: Node,
+            side: str,
+            edge_index: int,
+            total_edges: int,
+            is_target: bool = False,
     ) -> VirtualNode | None:
         """Select snapping point using Gaussian distribution for multiple edges.
 
@@ -874,9 +874,9 @@ class VirtualGrid:
         return candidates_sorted[0] if candidates_sorted else None
 
     def get_snapping_points_for_side(
-        self,
-        node: Node,
-        side: str,
+            self,
+            node: Node,
+            side: str,
     ) -> list[VirtualNode]:
         """Get all snapping points for a node side."""
         node_id = id(node)
@@ -885,9 +885,9 @@ class VirtualGrid:
         return self._snapping_points[node_id].get(side, [])
 
     def get_nearest_grid_point(
-        self,
-        x: float,
-        y: float,
+            self,
+            x: float,
+            y: float,
     ) -> tuple[int, int] | None:
         """Get nearest non-blocked grid point to world coordinates."""
         spacing = self.config.grid_spacing
@@ -909,9 +909,9 @@ class VirtualGrid:
 
 
 def simplify_path_douglas_peucker(
-    points: list[tuple[float, float]],
-    tolerance: float,
-    min_waypoint_spacing: float = 150.0,
+        points: list[tuple[float, float]],
+        tolerance: float,
+        min_waypoint_spacing: float = 150.0,
 ) -> list[tuple[float, float]]:
     """Simplify path using Douglas-Peucker algorithm with minimum waypoint density.
 
@@ -937,9 +937,9 @@ def simplify_path_douglas_peucker(
 
 
 def _ensure_waypoint_density(
-    original: list[tuple[float, float]],
-    simplified: list[tuple[float, float]],
-    max_spacing: float,
+        original: list[tuple[float, float]],
+        simplified: list[tuple[float, float]],
+        max_spacing: float,
 ) -> list[tuple[float, float]]:
     """Ensure waypoints are spaced no more than max_spacing apart.
 
@@ -1002,8 +1002,8 @@ def _ensure_waypoint_density(
 
 
 def _douglas_peucker_recursive(
-    points: list[tuple[float, float]],
-    tolerance: float,
+        points: list[tuple[float, float]],
+        tolerance: float,
 ) -> list[tuple[float, float]]:
     """Recursive Douglas-Peucker implementation."""
     if len(points) <= 2:
@@ -1032,9 +1032,9 @@ def _douglas_peucker_recursive(
 
 
 def _perpendicular_distance(
-    point: tuple[float, float],
-    line_start: tuple[float, float],
-    line_end: tuple[float, float],
+        point: tuple[float, float],
+        line_start: tuple[float, float],
+        line_end: tuple[float, float],
 ) -> float:
     """Calculate perpendicular distance from point to line."""
     px, py = point
@@ -1056,9 +1056,9 @@ def _perpendicular_distance(
 
 
 def compute_bezier_control_points(
-    points: list[tuple[float, float]],
-    tension: float = 0.3,
-    max_control_distance: float = 50.0,
+        points: list[tuple[float, float]],
+        tension: float = 0.3,
+        max_control_distance: float = 50.0,
 ) -> list[tuple[float, float]]:
     """Compute smooth Bezier control points for a path.
 
@@ -1118,7 +1118,7 @@ def compute_bezier_control_points(
 
 
 def extract_orthogonal_waypoints(
-    points: list[tuple[float, float]],
+        points: list[tuple[float, float]],
 ) -> list[tuple[float, float]]:
     """Extract waypoints for orthogonal (right-angle) paths.
 
@@ -1159,8 +1159,8 @@ def extract_orthogonal_waypoints(
 
 
 def compute_rounded_polyline(
-    points: list[tuple[float, float]],
-    corner_radius: float = 10.0,
+        points: list[tuple[float, float]],
+        corner_radius: float = 10.0,
 ) -> list[dict]:
     """Convert path points to a polyline with rounded corners.
 
@@ -1232,8 +1232,8 @@ def compute_rounded_polyline(
 
 
 def straighten_endpoints(
-    points: list[tuple[float, float]],
-    distance: float = 20.0,
+        points: list[tuple[float, float]],
+        distance: float = 20.0,
 ) -> list[tuple[float, float]]:
     """Ensure the first and last segments are straight (perpendicular-ish).
 
@@ -1263,7 +1263,7 @@ def straighten_endpoints(
 
 
 def compute_path_center(
-    points: list[tuple[float, float]],
+        points: list[tuple[float, float]],
 ) -> tuple[float, float]:
     """Compute the center point of a path using arc length.
 
@@ -1319,7 +1319,7 @@ def compute_path_center(
 
 
 def compute_bezier_path_center(
-    control_points: list[tuple[float, float]],
+        control_points: list[tuple[float, float]],
 ) -> tuple[float, float]:
     """Compute the center point of a Bezier path.
 
@@ -1354,8 +1354,8 @@ def compute_bezier_path_center(
             t = i / samples_per_segment
             # Cubic Bezier formula
             mt = 1 - t
-            x = mt**3 * p0[0] + 3 * mt**2 * t * c1[0] + 3 * mt * t**2 * c2[0] + t**3 * p3[0]
-            y = mt**3 * p0[1] + 3 * mt**2 * t * c1[1] + 3 * mt * t**2 * c2[1] + t**3 * p3[1]
+            x = mt ** 3 * p0[0] + 3 * mt ** 2 * t * c1[0] + 3 * mt * t ** 2 * c2[0] + t ** 3 * p3[0]
+            y = mt ** 3 * p0[1] + 3 * mt ** 2 * t * c1[1] + 3 * mt * t ** 2 * c2[1] + t ** 3 * p3[1]
             sample_points.append((x, y))
 
     return compute_path_center(sample_points)

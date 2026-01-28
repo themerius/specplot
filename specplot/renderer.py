@@ -33,18 +33,18 @@ class Theme:
     """Color theme for diagrams."""
 
     def __init__(
-        self,
-        background: str = "#ffffff",
-        node_fill: str = "#f8fafc",
-        node_stroke: str = "#cbd5e1",
-        node_header_fill: str = "#e2e8f0",
-        group_fill: str = "#f1f5f9",
-        group_stroke: str = "#94a3b8",
-        text_color: str = "#1e293b",
-        text_secondary: str = "#64748b",
-        icon_color: str = "#475569",
-        edge_color: str = "#64748b",
-        accent_color: str = "#3b82f6",
+            self,
+            background: str = "#ffffff",
+            node_fill: str = "#f8fafc",
+            node_stroke: str = "#cbd5e1",
+            node_header_fill: str = "#e2e8f0",
+            group_fill: str = "#f1f5f9",
+            group_stroke: str = "#94a3b8",
+            text_color: str = "#1e293b",
+            text_secondary: str = "#64748b",
+            icon_color: str = "#475569",
+            edge_color: str = "#64748b",
+            accent_color: str = "#3b82f6",
     ):
         self.background = background
         self.node_fill = node_fill
@@ -111,10 +111,10 @@ class EdgeRouter:
     """
 
     def __init__(
-        self,
-        diagram: Diagram,
-        config: LayoutConfig,
-        pathfinding_config: PathfindingConfig | None = None,
+            self,
+            diagram: Diagram,
+            config: LayoutConfig,
+            pathfinding_config: PathfindingConfig | None = None,
     ):
         from .models import Node, ShowAs
 
@@ -151,7 +151,7 @@ class EdgeRouter:
         return x + w / 2, y + h / 2
 
     def _detect_best_side(
-        self, src_node: Node, tgt_node: Node, is_source: bool
+            self, src_node: Node, tgt_node: Node, is_source: bool
     ) -> str:
         """Detect best connection side for a node based on the other endpoint."""
         from .models import ShowAs
@@ -193,11 +193,11 @@ class EdgeRouter:
                     return "top" if dy > 0 else "bottom"
 
     def _find_best_side_combination(
-        self,
-        src_node: Node,
-        tgt_node: Node,
-        src_target_y: float | None = None,
-        tgt_target_y: float | None = None,
+            self,
+            src_node: Node,
+            tgt_node: Node,
+            src_target_y: float | None = None,
+            tgt_target_y: float | None = None,
     ) -> tuple[str, str]:
         """Find the best side combination by trying all options and comparing path costs.
 
@@ -488,8 +488,8 @@ class EdgeRouter:
                 src_node = edge.source
                 # Check if this node is a DSL-created outline child
                 if (src_node._parent and
-                    src_node._parent.show_as == ShowAs.OUTLINE and
-                    src_node in src_node._parent.children):
+                        src_node._parent.show_as == ShowAs.OUTLINE and
+                        src_node in src_node._parent.children):
                     src_outline_idx = src_node._parent.children.index(src_node)
                 else:
                     src_outline_idx = None
@@ -503,8 +503,8 @@ class EdgeRouter:
                 tgt_node = edge.target
                 # Check if this node is a DSL-created outline child
                 if (tgt_node._parent and
-                    tgt_node._parent.show_as == ShowAs.OUTLINE and
-                    tgt_node in tgt_node._parent.children):
+                        tgt_node._parent.show_as == ShowAs.OUTLINE and
+                        tgt_node in tgt_node._parent.children):
                     tgt_outline_idx = tgt_node._parent.children.index(tgt_node)
                 else:
                     tgt_outline_idx = None
@@ -698,11 +698,11 @@ class EdgeRouter:
             }
 
     def _insert_perpendicular_waypoints(
-        self,
-        path_points: list[tuple[float, float]],
-        src_side: str,
-        tgt_side: str,
-        offset: float,
+            self,
+            path_points: list[tuple[float, float]],
+            src_side: str,
+            tgt_side: str,
+            offset: float,
     ) -> list[tuple[float, float]]:
         """Insert perpendicular waypoints to ensure clean exit/entry angles.
 
@@ -762,9 +762,9 @@ class EdgeRouter:
         return self._routed_paths.get(id(edge))
 
     def get_edge_points(self, edge: Edge) -> tuple[
-        tuple[float, float, str, bool],
-        tuple[float, float, str, bool]
-    ] | None:
+                                                 tuple[float, float, str, bool],
+                                                 tuple[float, float, str, bool]
+                                             ] | None:
         """Get assigned connection points for an edge.
 
         Returns ((sx, sy, src_side, src_detour), (tx, ty, tgt_side, tgt_detour))
@@ -785,9 +785,9 @@ class DiagramRenderer:
     """Renders diagrams to SVG."""
 
     def __init__(
-        self,
-        theme: Theme | None = None,
-        config: LayoutConfig | None = None,
+            self,
+            theme: Theme | None = None,
+            config: LayoutConfig | None = None,
     ):
         self.theme = theme or DEFAULT_THEME
         self.config = config or LayoutConfig()
@@ -1008,7 +1008,7 @@ class DiagramRenderer:
         d.append(
             draw.Line(
                 x, y + header_height,
-                x + w, y + header_height,
+                   x + w, y + header_height,
                 stroke=stroke,
                 stroke_width=1,
             )
@@ -1143,12 +1143,12 @@ class DiagramRenderer:
                 self._render_outline_item(d, node, item.text, item_y, level=0)
 
     def _render_outline_item(
-        self,
-        d: draw.Drawing,
-        node: Node,
-        text: str,
-        y: float,
-        level: int = 0,
+            self,
+            d: draw.Drawing,
+            node: Node,
+            text: str,
+            y: float,
+            level: int = 0,
     ) -> None:
         """Render an outline item (single line, truncated)."""
         x = node.x + self.config.node_padding + level * 12
@@ -1285,8 +1285,8 @@ class DiagramRenderer:
             # Calculate bezier midpoint at t=0.5
             t = 0.5
             # Bezier formula: B(t) = (1-t)^3*P0 + 3*(1-t)^2*t*P1 + 3*(1-t)*t^2*P2 + t^3*P3
-            mid_x = (1-t)**3 * sx + 3*(1-t)**2*t * c1x + 3*(1-t)*t**2 * c2x + t**3 * tx
-            mid_y = (1-t)**3 * sy + 3*(1-t)**2*t * c1y + 3*(1-t)*t**2 * c2y + t**3 * ty
+            mid_x = (1 - t) ** 3 * sx + 3 * (1 - t) ** 2 * t * c1x + 3 * (1 - t) * t ** 2 * c2x + t ** 3 * tx
+            mid_y = (1 - t) ** 3 * sy + 3 * (1 - t) ** 2 * t * c1y + 3 * (1 - t) * t ** 2 * c2y + t ** 3 * ty
 
             # Label background
             label_width = len(edge.label) * 7 + 12
@@ -1316,13 +1316,13 @@ class DiagramRenderer:
             )
 
     def _render_routed_edge(
-        self,
-        d: draw.Drawing,
-        edge: Edge,
-        routed_path: RoutedPath,
-        is_dotted: bool,
-        has_arrow_start: bool,
-        has_arrow_end: bool,
+            self,
+            d: draw.Drawing,
+            edge: Edge,
+            routed_path: RoutedPath,
+            is_dotted: bool,
+            has_arrow_start: bool,
+            has_arrow_end: bool,
     ) -> None:
         """Render an edge using pathfinding-based routing."""
         from .pathfinding import compute_rounded_polyline
@@ -1352,8 +1352,8 @@ class DiagramRenderer:
         # Get pathfinding config from the edge router or diagram
         pathfinding_config = getattr(self, '_current_pathfinding_config', None)
         is_orthogonal = (
-            pathfinding_config
-            and pathfinding_config.path_style == "orthogonal"
+                pathfinding_config
+                and pathfinding_config.path_style == "orthogonal"
         )
 
         if is_orthogonal:
@@ -1437,12 +1437,12 @@ class DiagramRenderer:
             )
 
     def _draw_arrowhead(
-        self,
-        d: draw.Drawing,
-        x: float,
-        y: float,
-        angle: float,
-        size: float,
+            self,
+            d: draw.Drawing,
+            x: float,
+            y: float,
+            angle: float,
+            size: float,
     ) -> None:
         """Draw an arrowhead at the given position and angle."""
         # Triangle arrowhead points

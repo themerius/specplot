@@ -41,12 +41,12 @@ def _parse_show_as(value: ShowAsLiteral | ShowAs) -> ShowAs:
 
 @contextmanager
 def diagram(
-    filename: str = "diagram",
-    title: str | None = None,
-    layout: tuple[tuple[str, ...], ...] | None = None,
-    pathfinding: bool | PathfindingConfig = True,
-    path_style: Literal["smooth", "orthogonal"] = "smooth",
-    **kwargs: Any,
+        filename: str = "diagram",
+        title: str | None = None,
+        layout: tuple[tuple[str, ...], ...] | None = None,
+        pathfinding: bool | PathfindingConfig = True,
+        path_style: Literal["smooth", "orthogonal"] = "smooth",
+        **kwargs: Any,
 ) -> Generator[Diagram]:
     """Create a diagram context.
 
@@ -159,13 +159,13 @@ class NodeContext:
 
 
 def node(
-    icon: str | None = "draft",
-    label: str = "",
-    description: str | None = None,
-    show_as: ShowAsLiteral | ShowAs = "outline",
-    grid: tuple[int, int] | None = None,
-    pos: int | None = None,
-    **kwargs: Any,
+        icon: str | None = "draft",
+        label: str = "",
+        description: str | None = None,
+        show_as: ShowAsLiteral | ShowAs = "outline",
+        grid: tuple[int, int] | None = None,
+        pos: int | None = None,
+        **kwargs: Any,
 ) -> NodeContext:
     """Create a node, optionally as a context for child nodes.
 
@@ -226,10 +226,10 @@ def node(
 
 
 def edge(
-    source: Node | NodeContext | OutlineItem,
-    target: Node | NodeContext | OutlineItem,
-    style: EdgeStyle | str = EdgeStyle.ARROW_RIGHT,
-    label: str | None = None,
+        source: Node | NodeContext | OutlineItem,
+        target: Node | NodeContext | OutlineItem,
+        style: EdgeStyle | str = EdgeStyle.ARROW_RIGHT,
+        label: str | None = None,
 ) -> Edge:
     """Create an edge between two nodes or outline items.
 
