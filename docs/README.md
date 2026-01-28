@@ -3,13 +3,13 @@
 ## Installation
 
 ```bash
-pip install specplot
+pip install git+https://github.com/themerius/specplot.git@main
 ```
 
 Or with uv:
 
 ```bash
-uv add specplot
+uv add git+https://github.com/themerius/specplot.git@main
 ```
 
 ## Core Concepts

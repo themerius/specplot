@@ -17,17 +17,25 @@ from specplot import diagram, node
 with diagram(filename="architecture"):
     user = node(icon="person", label="User")
 
-    with node(icon="cloud", label="Backend",
-             description="Handles all business logic",
-             show_as="group", grid=(1, 2)):
-        api = node(icon="api", label="API Gateway")
-        svc = node(icon="dns", label="Service")
+    with node(
+        icon="cloud", label="Our WebApp",
+        description="Layered architecture style.",
+        show_as="group", grid=(3, 1)
+    ) as app:
 
-    with node(icon="storage", label="Data Layer", show_as="outline") as data:
+        node(icon="web", label="Presentation Layer",
+             description="User interface components")
+        node(icon="account_tree", label="Business Layer",
+             description="Business logic and rules")
+        persistance = node(icon="storage", label="Persistence Layer",
+                           description="Data access and ORM")
+
+    with node(icon="database", label="Database Layer", show_as="outline") as dbs:
         node(label="PostgreSQL")
         node(label="Redis Cache")
 
-    user >> api >> svc >> data | "read/write"
+    user >> app
+    persistence >> dbs | "read/write"
 ```
 
 **Key Features:**
@@ -41,7 +49,13 @@ with diagram(filename="architecture"):
 ## Quick Start
 
 ```bash
-pip install specplot
+pip install git+https://github.com/themerius/specplot.git@main
+```
+
+Or with uv:
+
+```bash
+uv add git+https://github.com/themerius/specplot.git@main
 ```
 
 ```python
@@ -57,107 +71,6 @@ with diagram(filename="my_system"):
 Run your script — SVG appears in the current directory.
 
 ## Examples
-
-### Microservices Architecture
-
-Map your distributed system with groups and grids.
-
-![Microservices Example](docs/example_microservices.svg)
-
-<details>
-<summary>View code</summary>
-
-```python
-from specplot import diagram, node
-
-with diagram(filename="microservices", layout=(
-    ("LR",), ("LR",), ("LR",), ("LR",)
-)):
-    with node(icon="devices", label="Clients", show_as="group", grid=(1, 2), pos=1):
-        web = node(icon="web", label="Web Client")
-        mobile = node(icon="smartphone", label="Mobile App")
-
-    gateway = node(icon="api", label="API Gateway",
-                  description="Auth, rate limiting, routing", pos=2)
-
-    with node(icon="cloud", label="Services", show_as="group", grid=(2, 3), pos=3):
-        users = node(icon="person", label="User Service")
-        products = node(icon="inventory_2", label="Product Service")
-        orders = node(icon="receipt_long", label="Order Service")
-        payments = node(icon="payments", label="Payment Service")
-        inventory = node(icon="warehouse", label="Inventory")
-        notify = node(icon="notifications", label="Notifications")
-
-    with node(icon="storage", label="Databases", show_as="group", grid=(1, 3), pos=4):
-        userdb = node(icon="database", label="Users DB")
-        productdb = node(icon="database", label="Products DB")
-        orderdb = node(icon="database", label="Orders DB")
-
-    queue = node(icon="sync_alt", label="Message Queue",
-                description="Async events", pos=4)
-
-    web >> gateway
-    mobile >> gateway
-    gateway >> users
-    gateway >> products
-    gateway >> orders
-    orders >> payments | "process"
-    orders >> inventory | "reserve"
-    payments >> notify | "confirm"
-    users >> userdb
-    products >> productdb
-    orders >> orderdb
-    orders >> queue
-```
-
-</details>
-
-### Layered Architecture
-
-Express clean architecture with outline mode.
-
-![Layered Example](docs/example_layered.svg)
-
-<details>
-<summary>View code</summary>
-
-```python
-from specplot import diagram, node
-
-with diagram(filename="layered", layout=(("TB", "TB"), ("TB", "TB"))):
-    with node(icon="web", label="Presentation",
-             description="UI and controllers",
-             show_as="outline", pos=1):
-        node(label="React Components")
-        node(label="REST Controllers")
-        node(label="GraphQL Resolvers")
-
-    with node(icon="account_tree", label="Application",
-             description="Use cases",
-             show_as="outline", pos=2) as app:
-        node(label="Command Handlers")
-        node(label="Query Handlers")
-        node(label="Event Handlers")
-
-    with node(icon="hub", label="Domain",
-             description="Business rules",
-             show_as="outline", pos=3) as domain:
-        node(label="Entities")
-        node(label="Value Objects")
-        node(label="Domain Services")
-
-    with node(icon="dns", label="Infrastructure",
-             description="External concerns",
-             show_as="outline", pos=4) as infra:
-        node(label="Repositories")
-        node(label="API Clients")
-        node(label="Caching")
-
-    app >> domain | "depends on"
-    infra >> domain | "implements"
-```
-
-</details>
 
 ### Data Pipeline
 
@@ -192,11 +105,11 @@ with diagram(filename="pipeline", layout=(
     lake = node(icon="waves", label="Data Lake",
                description="S3 / Delta Lake", pos=4)
 
-    with node(icon="psychology", label="ML Pipeline", show_as="group", grid=(1, 2), pos=5):
+    with node(icon="psychology", label="ML Pipeline", show_as="group", grid=(2, 1), pos=5) as ml:
         train = node(icon="model_training", label="Training")
         serve = node(icon="cloud_upload", label="Serving")
 
-    with node(icon="analytics", label="Outputs", show_as="group", grid=(1, 2), pos=6):
+    with node(icon="analytics", label="Outputs", show_as="group", grid=(2, 1), pos=6):
         dash = node(icon="dashboard", label="Dashboards")
         alerts = node(icon="notifications", label="Alerts")
 
@@ -205,10 +118,73 @@ with diagram(filename="pipeline", layout=(
     files >> ingest
     ingest >> proc | "stream"
     proc >> lake | "batch"
-    lake >> train | "features"
+    lake >> ml | "features"
     train >> serve | "deploy"
     serve >> dash | "predictions"
     serve >> alerts | "anomalies"
+```
+
+</details>
+
+### Event-Driven Architecture
+
+Broker topology with event channels and processors.
+
+![Event-Driven Example](docs/example_event_driven.svg)
+
+<details>
+<summary>View code</summary>
+
+```python
+from specplot import diagram, node, edge
+
+with diagram(filename="event_driven", pathfinding=False,
+            layout=(("TB", "TB", "TB"),)):
+    # Initiating Event
+    initiator = node(icon="bolt", label="Initiating Event",
+                    description="Triggers the flow", pos=1)
+
+    # Event Channels (broker)
+    with node(icon="sync_alt", label="Event Channels",
+             description="Message broker",
+             show_as="group", grid=(3, 1), pos=2) as channels:
+        ch1 = node(icon="valve", label="Event Channel 1")
+        ch2 = node(icon="valve", label="Event Channel 2")
+        ch3 = node(icon="valve", label="Event Channel 3")
+
+    # Event Processors (left side)
+    with node(icon="settings", label="Processor", show_as="outline", pos=1) as proc2:
+        node(label="Component")
+        node(label="Component")
+
+    with node(icon="settings", label="Processor", show_as="group", grid=(3, 1), pos=1) as proc4:
+        node(label="Component")
+        node(label="Component")
+        proc_event2 = node(icon="bolt", label="Processing Event")
+
+    # Event Processors (right side)
+    with node(icon="settings", label="Processor", show_as="group", grid=(3, 1), pos=3) as proc1:
+        node(label="Component")
+        node(label="Component")
+        proc1_event = node(icon="bolt", label="Processing Event")
+
+    with node(icon="settings", label="Processor", show_as="outline", pos=3) as proc3:
+        node(label="Component")
+        node(label="Component")
+
+    with node(icon="settings", label="Processor", show_as="outline", pos=3) as proc5:
+        node(label="Component")
+        node(label="Component")
+
+    # Connections (dotted arrows for async events)
+    edge(initiator, ch1, style='..>')
+    edge(ch1, proc1, style='..>')
+    edge(proc1_event, ch2, style='..>')
+    edge(ch2, proc2, style='..>')
+    edge(ch2, proc3, style='..>')
+    edge(ch2, proc4, style='..>')
+    edge(proc_event2, ch3, style='..>')
+    edge(ch3, proc5, style='..>')
 ```
 
 </details>

@@ -6,11 +6,10 @@ from specplot import diagram, node, edge
 def hero_example():
     """Hero example: Shows all key features in one compact diagram."""
     with diagram(
-        filename="docs/hero",
-        layout=(("LR",), ("LR",), ("LR",))
+        filename="docs/hero"
     ):
         # Node without description
-        user = node(icon="person", label="User", pos=1)
+        user = node(icon="person", label="User")
 
         # Group node with children (grid layout)
         with node(
@@ -18,46 +17,27 @@ def hero_example():
             label="Our WebApp",
             description="Layered architecture style.",
             show_as="group",
-            grid=(3,1),
-            pos=2
+            grid=(3,1)
         ) as app:
-            # Presentation Layer
-            presentation = node(
-                icon="web",
-                label="Presentation Layer",
-                description="User interface components",
-                pos=1
-            )
-
-            # Business Layer
-            business = node(
-                icon="account_tree",
-                label="Business Layer",
-                description="Business logic and rules",
-                pos=2
-            )
-
-            # Persistence Layer
-            persistence = node(
-                icon="storage",
-                label="Persistence Layer",
-                description="Data access and ORM",
-                pos=3
-            )
+            node(icon="web", label="Presentation Layer",
+                 description="User interface components")
+            node(icon="account_tree", label="Business Layer",
+                 description="Business logic and rules")
+            persistance = node(icon="storage", label="Persistence Layer",
+                               description="Data access and ORM")
 
         # Outline node (bullet list style)
         with node(
             icon="database",
             label="Database Layer",
-            show_as="outline",
-            pos=3
+            show_as="outline"
         ) as dbs:
             node(label="PostgreSQL")
             node(label="Redis Cache")
 
         # Edges with and without labels
         user >> app
-        persistence >> dbs | "read/write"
+        persistance >> dbs | "read/write"
 
 
 
@@ -119,13 +99,13 @@ def example_pipeline():
 
 
 
-def example_from_literature_event_driven():
+def example_event_driven():
     """Event-Driven Architecture - Broker topology.
 
     Reference: Fundamentals of Software Architecture, Chapter 14
     """
     with diagram(
-        filename="docs/literature_event_driven",
+        filename="docs/example_event_driven",
         pathfinding=False,
         layout=(
             ("TB", "TB", "TB"),  # Initiator, channels, processors
@@ -203,7 +183,7 @@ if __name__ == "__main__":
     example_pipeline()
 
     print("Generating event-driven architecture...")
-    example_from_literature_event_driven()
+    example_event_driven()
 
 
     print("\nAll examples generated in docs/")
