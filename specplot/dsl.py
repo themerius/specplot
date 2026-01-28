@@ -44,7 +44,7 @@ def diagram(
     filename: str = "diagram",
     title: str | None = None,
     layout: tuple[tuple[str, ...], ...] | None = None,
-    pathfinding: bool | PathfindingConfig = False,
+    pathfinding: bool | PathfindingConfig = True,
     path_style: Literal["smooth", "orthogonal"] = "smooth",
     **kwargs: Any,
 ) -> Generator[Diagram]:

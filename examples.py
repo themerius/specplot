@@ -1,140 +1,106 @@
 """Showcase examples for specplot README."""
 
-from specplot import diagram, node
+from specplot import diagram, node, edge
 
 
 def hero_example():
-    """Hero example: Simple 3-tier web architecture in 12 lines."""
-    with diagram(filename="docs/hero"):
-        user = node(icon="person", label="User")
+    """Hero example: Shows all key features in one compact diagram."""
+    with diagram(
+        filename="docs/hero",
+        layout=(("LR",), ("LR",), ("LR",))
+    ):
+        # Node without description
+        user = node(icon="person", label="User", pos=1)
 
-        with node(icon="cloud", label="Web App", show_as="group", grid=(1, 2)):
-            frontend = node(icon="web", label="Frontend")
-            api = node(icon="api", label="API")
+        # Group node with children (grid layout)
+        with node(
+            icon="cloud",
+            label="Our WebApp",
+            description="Layered architecture style.",
+            show_as="group",
+            grid=(3,1),
+            pos=2
+        ) as app:
+            # Presentation Layer
+            presentation = node(
+                icon="web",
+                label="Presentation Layer",
+                description="User interface components",
+                pos=1
+            )
 
-        db = node(icon="database", label="PostgreSQL")
+            # Business Layer
+            business = node(
+                icon="account_tree",
+                label="Business Layer",
+                description="Business logic and rules",
+                pos=2
+            )
 
-        user >> frontend >> api >> db
+            # Persistence Layer
+            persistence = node(
+                icon="storage",
+                label="Persistence Layer",
+                description="Data access and ORM",
+                pos=3
+            )
 
+        # Outline node (bullet list style)
+        with node(
+            icon="database",
+            label="Database Layer",
+            show_as="outline",
+            pos=3
+        ) as dbs:
+            node(label="PostgreSQL")
+            node(label="Redis Cache")
 
-def example_microservices():
-    """Example 1: E-commerce microservices architecture."""
-    with diagram(filename="docs/example_microservices"):
-        # Entry points
-        web = node(icon="web", label="Web Client")
-        mobile = node(icon="smartphone", label="Mobile App")
+        # Edges with and without labels
+        user >> app
+        persistence >> dbs | "read/write"
 
-        # API Gateway
-        gateway = node(icon="api", label="API Gateway",
-                      description="Auth, rate limiting, routing")
-
-        # Services as a group
-        with node(icon="cloud", label="Services", show_as="group", grid=(2, 3)):
-            users = node(icon="person", label="User Service")
-            products = node(icon="inventory_2", label="Product Service")
-            orders = node(icon="receipt_long", label="Order Service")
-            payments = node(icon="payments", label="Payment Service")
-            inventory = node(icon="warehouse", label="Inventory Service")
-            notify = node(icon="notifications", label="Notification Service")
-
-        # Data stores
-        with node(icon="storage", label="Data Layer", show_as="group", grid=(1, 3)):
-            userdb = node(icon="database", label="Users DB")
-            productdb = node(icon="database", label="Products DB")
-            orderdb = node(icon="database", label="Orders DB")
-
-        queue = node(icon="sync_alt", label="Message Queue",
-                    description="Async event processing")
-
-        # Connections
-        web >> gateway
-        mobile >> gateway
-        gateway >> users
-        gateway >> products
-        gateway >> orders
-        orders >> payments | "process"
-        orders >> inventory | "reserve"
-        payments >> notify | "confirm"
-        users >> userdb
-        products >> productdb
-        orders >> orderdb
-        orders >> queue
-
-
-def example_layered():
-    """Example 2: Clean Architecture with outline mode."""
-    with diagram(filename="docs/example_layered"):
-        # Presentation layer
-        with node(icon="web", label="Presentation",
-                 description="UI components and controllers",
-                 show_as="outline"):
-            node(label="React Components")
-            node(label="REST Controllers")
-            node(label="GraphQL Resolvers")
-
-        # Application layer
-        with node(icon="account_tree", label="Application",
-                 description="Use cases and orchestration",
-                 show_as="outline") as app:
-            node(label="Command Handlers")
-            node(label="Query Handlers")
-            node(label="Event Handlers")
-
-        # Domain layer
-        with node(icon="hub", label="Domain",
-                 description="Business logic and rules",
-                 show_as="outline") as domain:
-            node(label="Entities")
-            node(label="Value Objects")
-            node(label="Domain Services")
-            node(label="Repository Interfaces")
-
-        # Infrastructure layer
-        with node(icon="dns", label="Infrastructure",
-                 description="External concerns",
-                 show_as="outline") as infra:
-            node(label="Database Repositories")
-            node(label="External API Clients")
-            node(label="Message Brokers")
-            node(label="Caching")
-
-        # Dependency flow (inward)
-        app >> domain | "depends on"
-        infra >> domain | "implements"
 
 
 def example_pipeline():
     """Example 3: ML Data Pipeline with mixed modes."""
-    with diagram(filename="docs/example_pipeline"):
+    with diagram(
+        filename="docs/example_pipeline",
+        layout=(
+            ("LR",),        # Sources
+            ("LR", "LR"),   # Ingestion + Processing
+            ("LR",),        # Lake
+            ("LR", "LR"),   # ML + Outputs
+        )
+    ):
         # Data sources
-        with node(icon="source", label="Data Sources", show_as="group", grid=(1, 3)):
-            api_src = node(icon="api", label="REST APIs")
+        with node(icon="source", label="Data Sources", show_as="group", grid=(1, 3), pos=1):
+            api_src = node(icon="api", label="APIs")
             db_src = node(icon="database", label="Databases")
-            files = node(icon="folder", label="File Storage")
+            files = node(icon="folder", label="Files")
 
         # Ingestion
-        ingest = node(icon="input", label="Ingestion Layer",
-                     description="Apache Kafka / Kinesis")
+        ingest = node(icon="input", label="Ingestion",
+                     description="Kafka / Kinesis", pos=2)
 
         # Processing with outline
         with node(icon="memory", label="Processing",
-                 description="Spark / Flink jobs",
-                 show_as="outline") as proc:
-            node(label="Validation & Cleaning")
+                 description="Spark / Flink",
+                 show_as="outline", pos=3) as proc:
+            node(label="Validation")
             node(label="Feature Engineering")
             node(label="Aggregations")
 
         # Storage
         lake = node(icon="waves", label="Data Lake",
-                   description="S3 / Delta Lake")
+                   description="S3 / Delta Lake", pos=4)
 
         # ML Pipeline as group
-        with node(icon="psychology", label="ML Pipeline", show_as="group", grid=(1, 2)):
+        with node(icon="psychology", label="ML Pipeline", show_as="group", grid=(2, 1), pos=5) as ml:
             train = node(icon="model_training", label="Training")
-            serve = node(icon="cloud_upload", label="Model Serving")
+            serve = node(icon="cloud_upload", label="Serving")
 
         # Outputs
-        with node(icon="analytics", label="Outputs", show_as="group", grid=(1, 2)):
+        with node(icon="analytics", label="Outputs", show_as="group", grid=(2,1), pos=6):
             dash = node(icon="dashboard", label="Dashboards")
             alerts = node(icon="notifications", label="Alerts")
 
@@ -144,10 +110,86 @@ def example_pipeline():
         files >> ingest
         ingest >> proc | "stream"
         proc >> lake | "batch"
-        lake >> train | "features"
+        lake >> ml | "features"
         train >> serve | "deploy"
         serve >> dash | "predictions"
         serve >> alerts | "anomalies"
+
+
+
+
+
+def example_from_literature_event_driven():
+    """Event-Driven Architecture - Broker topology.
+
+    Reference: Fundamentals of Software Architecture, Chapter 14
+    """
+    with diagram(
+        filename="docs/literature_event_driven",
+        pathfinding=False,
+        layout=(
+            ("TB", "TB", "TB"),  # Initiator, channels, processors
+        )
+    ):
+        # Initiating Event
+        initiator = node(
+            icon="bolt",
+            label="Initiating Event",
+            description="Triggers the flow",
+            pos=1
+        )
+
+        # Event Channels (broker)
+        with node(
+            icon="sync_alt",
+            label="Event Channels",
+            description="Message broker",
+            show_as="group",
+            grid=(3,1),
+            pos=2
+        ) as channels:
+            ch1 = node(icon="valve", label="Event Channel 1")
+            ch2 = node(icon="valve", label="Event Channel 2")
+            ch3 = node(icon="valve", label="Event Channel 3")
+
+
+        # Event Processors (left side)
+        with node(icon="settings", label="Processor", show_as="outline", pos=1) as proc2:
+            node(label="Component")
+            node(label="Component")
+
+        with node(icon="settings", label="Processor", show_as="group", grid=(3,1), pos=1) as proc4:
+            node(label="Component")
+            node(label="Component")
+            proc_event2 = node(icon="bolt", label="Processing Event")
+
+        # Event Processors (right side)
+        with node(icon="settings", label="Processor", show_as="group", grid=(3,1), pos=3) as proc1:
+            node(label="Component")
+            node(label="Component")
+            proc1_event = node(icon="bolt", label="Processing Event")
+
+        with node(icon="settings", label="Processor", show_as="outline", pos=3) as proc3:
+            node(label="Component")
+            node(label="Component")
+
+        with node(icon="settings", label="Processor", show_as="outline", pos=3) as proc5:
+            node(label="Component")
+            node(label="Component")
+
+
+        # Connections
+        edge(initiator, ch1, style='..>')
+        edge(ch1, proc1, style='..>')
+        edge(proc1_event, ch2, style='..>')
+        edge(ch2, proc2, style='..>')
+        edge(ch2, proc3, style='..>')
+        edge(ch2, proc4, style='..>')
+        edge(proc_event2, ch3, style='..>')
+        edge(ch3, proc5, style='..>')
+
+
+
 
 
 if __name__ == "__main__":
@@ -157,13 +199,11 @@ if __name__ == "__main__":
     print("Generating hero example...")
     hero_example()
 
-    print("Generating microservices example...")
-    example_microservices()
-
-    print("Generating layered architecture example...")
-    example_layered()
-
     print("Generating data pipeline example...")
     example_pipeline()
+
+    print("Generating event-driven architecture...")
+    example_from_literature_event_driven()
+
 
     print("\nAll examples generated in docs/")

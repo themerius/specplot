@@ -17,13 +17,17 @@ from specplot import diagram, node
 with diagram(filename="architecture"):
     user = node(icon="person", label="User")
 
-    with node(icon="cloud", label="Web App", show_as="group", grid=(1, 2)):
-        frontend = node(icon="web", label="Frontend")
-        api = node(icon="api", label="API")
+    with node(icon="cloud", label="Backend",
+             description="Handles all business logic",
+             show_as="group", grid=(1, 2)):
+        api = node(icon="api", label="API Gateway")
+        svc = node(icon="dns", label="Service")
 
-    db = node(icon="database", label="PostgreSQL")
+    with node(icon="storage", label="Data Layer", show_as="outline") as data:
+        node(label="PostgreSQL")
+        node(label="Redis Cache")
 
-    user >> frontend >> api >> db
+    user >> api >> svc >> data | "read/write"
 ```
 
 **Key Features:**
@@ -31,7 +35,7 @@ with diagram(filename="architecture"):
 - **Outline-first** — `show_as="outline"` for bullet lists, `show_as="group"` for nested boxes
 - **Pythonic DSL** — Context managers, `>>` for edges, `|` for labels
 - **Publication-ready** — Clean SVG output for papers, docs, presentations
-- **Smart routing** — A* pathfinding routes edges around obstacles
+- **Smart routing** — A* pathfinding routes edges around obstacles (enabled by default)
 - **Material icons** — 2000+ icons from Google Material Symbols
 
 ## Quick Start
@@ -66,28 +70,31 @@ Map your distributed system with groups and grids.
 ```python
 from specplot import diagram, node
 
-with diagram(filename="microservices"):
-    web = node(icon="web", label="Web Client")
-    mobile = node(icon="smartphone", label="Mobile App")
+with diagram(filename="microservices", layout=(
+    ("LR",), ("LR",), ("LR",), ("LR",)
+)):
+    with node(icon="devices", label="Clients", show_as="group", grid=(1, 2), pos=1):
+        web = node(icon="web", label="Web Client")
+        mobile = node(icon="smartphone", label="Mobile App")
 
     gateway = node(icon="api", label="API Gateway",
-                  description="Auth, rate limiting, routing")
+                  description="Auth, rate limiting, routing", pos=2)
 
-    with node(icon="cloud", label="Services", show_as="group", grid=(2, 3)):
+    with node(icon="cloud", label="Services", show_as="group", grid=(2, 3), pos=3):
         users = node(icon="person", label="User Service")
         products = node(icon="inventory_2", label="Product Service")
         orders = node(icon="receipt_long", label="Order Service")
         payments = node(icon="payments", label="Payment Service")
-        inventory = node(icon="warehouse", label="Inventory Service")
-        notify = node(icon="notifications", label="Notification Service")
+        inventory = node(icon="warehouse", label="Inventory")
+        notify = node(icon="notifications", label="Notifications")
 
-    with node(icon="storage", label="Data Layer", show_as="group", grid=(1, 3)):
+    with node(icon="storage", label="Databases", show_as="group", grid=(1, 3), pos=4):
         userdb = node(icon="database", label="Users DB")
         productdb = node(icon="database", label="Products DB")
         orderdb = node(icon="database", label="Orders DB")
 
     queue = node(icon="sync_alt", label="Message Queue",
-                description="Async event processing")
+                description="Async events", pos=4)
 
     web >> gateway
     mobile >> gateway
@@ -117,35 +124,33 @@ Express clean architecture with outline mode.
 ```python
 from specplot import diagram, node
 
-with diagram(filename="layered"):
+with diagram(filename="layered", layout=(("TB", "TB"), ("TB", "TB"))):
     with node(icon="web", label="Presentation",
-             description="UI components and controllers",
-             show_as="outline"):
+             description="UI and controllers",
+             show_as="outline", pos=1):
         node(label="React Components")
         node(label="REST Controllers")
         node(label="GraphQL Resolvers")
 
     with node(icon="account_tree", label="Application",
-             description="Use cases and orchestration",
-             show_as="outline") as app:
+             description="Use cases",
+             show_as="outline", pos=2) as app:
         node(label="Command Handlers")
         node(label="Query Handlers")
         node(label="Event Handlers")
 
     with node(icon="hub", label="Domain",
-             description="Business logic and rules",
-             show_as="outline") as domain:
+             description="Business rules",
+             show_as="outline", pos=3) as domain:
         node(label="Entities")
         node(label="Value Objects")
         node(label="Domain Services")
-        node(label="Repository Interfaces")
 
     with node(icon="dns", label="Infrastructure",
              description="External concerns",
-             show_as="outline") as infra:
-        node(label="Database Repositories")
-        node(label="External API Clients")
-        node(label="Message Brokers")
+             show_as="outline", pos=4) as infra:
+        node(label="Repositories")
+        node(label="API Clients")
         node(label="Caching")
 
     app >> domain | "depends on"
@@ -166,30 +171,32 @@ Visualize data flows with mixed display modes.
 ```python
 from specplot import diagram, node
 
-with diagram(filename="pipeline"):
-    with node(icon="source", label="Data Sources", show_as="group", grid=(1, 3)):
-        api_src = node(icon="api", label="REST APIs")
+with diagram(filename="pipeline", layout=(
+    ("LR",), ("LR", "LR"), ("LR",), ("LR", "LR")
+)):
+    with node(icon="source", label="Data Sources", show_as="group", grid=(1, 3), pos=1):
+        api_src = node(icon="api", label="APIs")
         db_src = node(icon="database", label="Databases")
-        files = node(icon="folder", label="File Storage")
+        files = node(icon="folder", label="Files")
 
-    ingest = node(icon="input", label="Ingestion Layer",
-                 description="Apache Kafka / Kinesis")
+    ingest = node(icon="input", label="Ingestion",
+                 description="Kafka / Kinesis", pos=2)
 
     with node(icon="memory", label="Processing",
-             description="Spark / Flink jobs",
-             show_as="outline") as proc:
-        node(label="Validation & Cleaning")
+             description="Spark / Flink",
+             show_as="outline", pos=3) as proc:
+        node(label="Validation")
         node(label="Feature Engineering")
         node(label="Aggregations")
 
     lake = node(icon="waves", label="Data Lake",
-               description="S3 / Delta Lake")
+               description="S3 / Delta Lake", pos=4)
 
-    with node(icon="psychology", label="ML Pipeline", show_as="group", grid=(1, 2)):
+    with node(icon="psychology", label="ML Pipeline", show_as="group", grid=(1, 2), pos=5):
         train = node(icon="model_training", label="Training")
-        serve = node(icon="cloud_upload", label="Model Serving")
+        serve = node(icon="cloud_upload", label="Serving")
 
-    with node(icon="analytics", label="Outputs", show_as="group", grid=(1, 2)):
+    with node(icon="analytics", label="Outputs", show_as="group", grid=(1, 2), pos=6):
         dash = node(icon="dashboard", label="Dashboards")
         alerts = node(icon="notifications", label="Alerts")
 

@@ -101,10 +101,40 @@ Add labels with `|`:
 api >> db | "SQL queries"
 ```
 
-Edge styles:
-- `>>` — Arrow right (default)
-- `<<` — Arrow left
-- `-` — Undirected line
+### Edge Styles
+
+**Operator syntax** (common cases):
+
+```python
+a >> b              # Arrow right: A ──→ B
+b << a              # Arrow left:  A ←── B
+a >> b | "label"    # With label:  A ──→ B (label)
+```
+
+**Explicit `edge()` function** (all styles):
+
+```python
+from specplot import edge
+
+edge(a, b, style="->")              # Arrow right (default)
+edge(a, b, style="<-")              # Arrow left
+edge(a, b, style="--")              # Line (no arrow)
+edge(a, b, style="..")              # Dotted line
+edge(a, b, style="..>")             # Dotted arrow right
+edge(a, b, style="<..")             # Dotted arrow left
+edge(a, b, style="->", label="HTTP") # With label
+```
+
+**Style reference:**
+
+| Style | Code | Result |
+|-------|------|--------|
+| Arrow right | `a >> b` or `style="->"` | `───→` |
+| Arrow left | `a << b` or `style="<-"` | `←───` |
+| Line | `style="--"` | `────` |
+| Dotted | `style=".."` | `┈┈┈┈` |
+| Dotted arrow right | `style="..>"` | `┈┈┈→` |
+| Dotted arrow left | `style="<.."` | `←┈┈┈` |
 
 ### Layout
 
@@ -129,11 +159,13 @@ with diagram(filename="zones", layout=(
 
 ### Pathfinding
 
-Enable intelligent edge routing to avoid crossing nodes:
+Intelligent edge routing is **enabled by default**. Edges automatically find paths around obstacles.
+
+To disable pathfinding (use simple bezier curves):
 
 ```python
-with diagram(filename="smart", pathfinding=True):
-    # edges will route around obstacles
+with diagram(filename="simple", pathfinding=False):
+    # edges use direct bezier curves
 ```
 
 Custom configuration:
@@ -212,7 +244,7 @@ with diagram(filename="architecture"):
 from specplot import diagram, node, edge, PathfindingConfig
 ```
 
-### diagram(filename, title=None, layout=None, pathfinding=False)
+### diagram(filename, title=None, layout=None, pathfinding=True)
 
 Context manager that creates and renders a diagram.
 
